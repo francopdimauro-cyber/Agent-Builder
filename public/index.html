@@ -60,6 +60,30 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;margin-top:12px;font-size:14px;max-height:360px;overflow:auto}
 .notice{border-left:3px solid var(--warn);padding:6px 10px;margin:10px 0;color:var(--mute);font-size:14px}
 @media (max-width:760px){.app{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}.list{max-height:200px}.row{grid-template-columns:1fr}}
+
+.nav{display:flex;gap:6px;padding:0 14px 10px}
+.nav button{flex:1;border:1px solid var(--line);background:none;border-radius:6px;padding:7px 6px;cursor:pointer}
+.nav button[aria-current=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:14px}
+.bar > div{min-width:170px}
+.bar label{margin:0 0 4px;font-size:13px}
+.ex{border:1px solid var(--line);border-radius:8px;background:var(--panel);margin-bottom:10px;padding:10px 12px}
+.exh{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.exh .tg{background:none;border:0;cursor:pointer;font-size:15px;padding:0 4px;color:var(--mute)}
+.exh .when{margin-left:auto;color:var(--mute);font-size:13px}
+.badge{font-size:12px;border:1px solid currentColor;border-radius:999px;padding:1px 9px}
+.b-completed{color:var(--ok)}.b-failed{color:var(--err)}.b-cancelled{color:var(--mute)}
+.b-running,.b-queued{color:var(--accent)}.b-awaiting_approval{color:var(--warn)}.b-draft{color:var(--mute)}
+.mini{border-radius:6px;padding:4px 12px;cursor:pointer;border:1px solid var(--line);background:none}
+.mini.ok{border-color:var(--accent);color:var(--accent)}
+.mini.no{color:var(--err)}
+.exb{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.exb h3{font-size:13px;margin:0 0 4px;color:var(--mute);font-weight:600}
+.exb pre{margin:0 0 10px;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font:13px/1.45 var(--mono);max-height:300px;overflow:auto}
+.exb pre.e{border-color:var(--err);color:var(--err)}
+.evs{list-style:none;margin:0;padding:0;font:12px/1.5 var(--mono)}
+.evs li{display:flex;gap:8px}.evs .t{color:var(--mute)}.evs .k{color:var(--accent)}
+@media (max-width:760px){.exb{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -78,12 +102,15 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="app" id="appRoot" hidden>
 <aside>
   <div class="brand">Agent Builder<small>Tus agentes de IA</small></div>
+  <div class="nav"><button id="navA" aria-current="true">Agentes</button><button id="navE" aria-current="false">Ejecuciones</button></div>
+  <div id="agentSide" style="display:contents">
   <div class="btns" style="margin:0 14px 8px"><button class="p" id="new" style="width:100%">Crear agente</button></div>
   <div class="list" id="list" aria-label="Lista de agentes"></div>
+  </div>
   <div class="conn"><span id="who" class="hint"></span><button class="s" id="logout" hidden>Cerrar sesión</button></div>
 </aside>
 
-<main>
+<main id="viewAgents">
   <h1 id="title">Nuevo agente</h1><p class="hint" id="meta"></p>
   <p class="sub" id="sub">Describe qué necesitas y la IA propone una configuración. Tú la revisas antes de guardar.</p>
 
@@ -131,6 +158,20 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="out" id="out" hidden></div>
   </section>
 </main>
+
+<main id="viewExec" hidden>
+  <h1>Centro de ejecución</h1>
+  <p class="sub">Historial de ejecuciones con entrada, salida, eventos, cancelación, reintentos y aprobaciones.</p>
+  <div class="bar">
+    <div><label for="fStatus">Estado</label>
+      <select id="fStatus"><option value="">Todos los estados</option></select></div>
+    <div><label for="fAgent">Agente</label>
+      <select id="fAgent"><option value="">Todos los agentes</option></select></div>
+    <button class="s" id="exRefresh" style="padding:8px 14px">Actualizar</button>
+    <span class="status" id="exSt" role="status"></span>
+  </div>
+  <div id="exList"></div>
+</main>
 </div>
 
 <script>
@@ -170,7 +211,7 @@ $("authGo").onclick = async () => {
   }catch(e){ say("authSt", e.message, "err"); }
 };
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("authGo").click(); });
-$("logout").onclick = async () => { try{ await api("POST","/api/auth/logout"); }catch{} showAuth(); };
+$("logout").onclick = async () => { clearInterval(execTimer); setView("agents"); try{ await api("POST","/api/auth/logout"); }catch{} showAuth(); };
 
 async function start(user){
   $("auth").hidden = true; $("appRoot").hidden = false;
@@ -261,6 +302,126 @@ $("gen").onclick = async () => {
   }catch(e){ say("genSt", e.message, "err"); }
   $("gen").disabled = false;
 };
+
+$("save").onclick = async () => {
+  $("save").disabled = true; say("saveSt","Guardando…");
+  try{
+    const cfg = collect();
+    if (current){ await api("POST","/api/agents/"+current+"/versions",{config:cfg}); await load(current); await open(current); say("saveSt","Versión guardada.","ok"); }
+    else { const d = await api("POST","/api/agents",{config:cfg, source: fromAi ? "ai" : "manual"}); await load(d.id); await open(d.id); say("saveSt","Agente guardado. Actívalo para poder ejecutarlo.","ok"); }
+  }catch(e){ say("saveSt", e.message, "err"); }
+  $("save").disabled = false;
+};
+$("toggle").onclick = async () => {
+  try{
+    await api("POST","/api/agents/"+current+"/status",{status: currentStatus === "active" ? "inactive" : "active"});
+    await load(current); await open(current); say("saveSt","Estado actualizado.","ok");
+  }catch(e){ say("saveSt", e.message, "err"); }
+};
+$("del").onclick = async () => {
+  if (!current || !confirm("¿Eliminar este agente? Esta acción no se puede deshacer.")) return;
+  try{ await api("DELETE","/api/agents/"+current); await load(); fill({}, null); }catch(e){ say("saveSt", e.message, "err"); }
+};
+
+$("run").onclick = async () => {
+  const input = $("input").value.trim();
+  if (!input) return say("runSt","Escribe un mensaje de entrada.","err");
+  $("run").disabled = true; say("runSt","Ejecutando…"); $("out").hidden = true;
+  try{
+    const r = await api("POST","/api/executions",{agentId:current, input});
+    const d = await api("GET","/api/executions/"+r.id);
+    const ex = d.execution;
+    if (ex.status === "awaiting_approval"){ say("runSt","Esperando aprobación: este agente requiere que apruebes antes de ejecutar.","ok"); }
+    else {
+      $("out").textContent = ex.status === "completed" ? ex.output : (ex.error || "La ejecución terminó con estado " + ex.status + ".");
+      $("out").hidden = false;
+      say("runSt", ex.status === "completed" ? "Completada" + (ex.model ? " con " + ex.model : "") + "." : "Falló.", ex.status === "completed" ? "ok" : "err");
+    }
+  }catch(e){ say("runSt", e.message, "err"); }
+  $("run").disabled = false;
+};
+
+/* ---- Centro de ejecución ---- */
+const ST = {draft:"Borrador",queued:"En cola",running:"Ejecutando",awaiting_approval:"Esperando aprobación",completed:"Completada",failed:"Fallida",cancelled:"Cancelada"};
+const TERMINAL = ["completed","failed","cancelled"];
+const openIds = new Set(); let view = "agents", execTimer = null;
+const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const fmt = s => s ? new Date(s).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"medium"}) : "";
+
+for (const k of Object.keys(ST)) { const o = document.createElement("option"); o.value = k; o.textContent = ST[k]; $("fStatus").appendChild(o); }
+
+function setView(v){
+  view = v;
+  $("viewAgents").hidden = v !== "agents"; $("viewExec").hidden = v !== "exec";
+  $("agentSide").style.display = v === "agents" ? "contents" : "none";
+  $("navA").setAttribute("aria-current", String(v === "agents")); $("navE").setAttribute("aria-current", String(v === "exec"));
+  clearInterval(execTimer);
+  if (v === "exec"){
+    const cur = $("fAgent").value;
+    $("fAgent").innerHTML = '<option value="">Todos los agentes</option>';
+    agents.forEach(a => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.name; $("fAgent").appendChild(o); });
+    $("fAgent").value = cur;
+    loadExec(); execTimer = setInterval(() => { if (!document.hidden) loadExec(true); }, 4000);
+  }
+}
+$("navA").onclick = () => setView("agents"); $("navE").onclick = () => setView("exec");
+$("fStatus").onchange = () => loadExec(); $("fAgent").onchange = () => loadExec(); $("exRefresh").onclick = () => loadExec();
+
+async function loadExec(quiet){
+  if (!quiet) say("exSt","Cargando…");
+  try{
+    const p = new URLSearchParams({limit:"100"});
+    if ($("fStatus").value) p.set("status", $("fStatus").value);
+    if ($("fAgent").value) p.set("agentId", $("fAgent").value);
+    const [ex, ap] = await Promise.all([api("GET","/api/executions?"+p), api("GET","/api/approvals?status=pending")]);
+    const pending = {}; (ap.approvals || []).forEach(a => { if (a.execution_id) pending[a.execution_id] = a.id; });
+    const list = ex.executions || [];
+    const box = $("exList"); box.textContent = "";
+    if (!list.length) box.appendChild(mk("p","empty","Aún no hay ejecuciones. Lanza un agente desde la pestaña Agentes y aparecerá aquí."));
+    for (const e of list) box.appendChild(await row(e, pending[e.id]));
+    say("exSt", list.length + (list.length === 1 ? " ejecución" : " ejecuciones"));
+  }catch(e){ say("exSt", e.message, "err"); }
+}
+
+async function row(e, approvalId){
+  const name = (agents.find(a => a.id === e.agent_id) || {}).name || "Agente eliminado";
+  const wrap = mk("div","ex"), head = mk("div","exh");
+  const isOpen = openIds.has(e.id);
+  const tg = mk("button","tg", isOpen ? "▾" : "▸"); tg.setAttribute("aria-label", isOpen ? "Ocultar detalle" : "Ver detalle"); tg.setAttribute("aria-expanded", String(isOpen));
+  tg.onclick = () => { isOpen ? openIds.delete(e.id) : openIds.add(e.id); loadExec(true); };
+  head.append(tg, mk("span","badge b-"+e.status, ST[e.status] || e.status), mk("b","",name),
+    mk("span","hint","v"+e.agent_version+" · intento "+e.attempt+(e.workflow_run_id ? " · flujo" : "")), mk("span","when",fmt(e.created_at)));
+  const act = (label, cls, fn, okMsg) => { const b = mk("button","mini "+cls,label); b.onclick = async () => { b.disabled = true; try{ await fn(); say("exSt",okMsg,"ok"); }catch(er){ say("exSt",er.message,"err"); } loadExec(true); }; head.appendChild(b); };
+  if (e.status === "awaiting_approval" && approvalId){
+    act("Aprobar","ok",() => api("POST","/api/approvals/"+approvalId+"/decision",{approve:true}),"Aprobada y ejecutada.");
+    act("Rechazar","no",() => api("POST","/api/approvals/"+approvalId+"/decision",{approve:false}),"Rechazada.");
+  }
+  if (!TERMINAL.includes(e.status)) act("Cancelar","no",() => api("POST","/api/executions/"+e.id+"/cancel"),"Cancelada.");
+  if ((e.status === "failed" || e.status === "cancelled") && !e.workflow_run_id) act("Reintentar","ok",() => api("POST","/api/executions/"+e.id+"/retry"),"Reintento lanzado.");
+  wrap.appendChild(head);
+  if (isOpen){
+    let events = []; try{ events = (await api("GET","/api/executions/"+e.id)).events || []; }catch{}
+    const body = mk("div","exb"), l = mk("div"), r = mk("div");
+    l.append(mk("h3","","Entrada"), mk("pre","",e.input));
+    l.append(mk("h3","","Salida"+(e.model ? " · "+e.model : "")));
+    if (e.error) l.appendChild(mk("pre","e",e.error));
+    if (e.output) l.appendChild(mk("pre","",e.output)); else if (!e.error) l.appendChild(mk("p","hint","Sin salida todavía."));
+    r.appendChild(mk("h3","","Eventos"));
+    const ol = mk("ol","evs");
+    events.forEach(ev => { const li = mk("li"); li.append(mk("span","t",new Date(ev.created_at).toLocaleTimeString("es-ES")), mk("span","k",ev.type), mk("span","",ev.message)); ol.appendChild(li); });
+    r.appendChild(ol); body.append(l, r); wrap.appendChild(body);
+  }
+  return wrap;
+}
+
+(async () => {
+  try{ const d = await api("GET","/api/auth/me"); start(d.user); }
+  catch{ showAuth(); }
+})();
+</script>
+</body>
+</html>
+
 
 $("save").onclick = async () => {
   $("save").disabled = true; say("saveSt","Guardando…");
