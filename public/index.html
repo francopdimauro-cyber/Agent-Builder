@@ -3,20 +3,308 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Factory Free</title>
+<title>Agent Builder</title>
 <style>
-  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; color: #1a1a1a; }
-  code { background: #eee; padding: .1em .35em; border-radius: 4px; }
-  #s { font-weight: 600; }
+:root{
+  --bg:#eef1ee; --panel:#fbfcfb; --ink:#1c2420; --mute:#5d6b63; --line:#cfd8d2;
+  --accent:#1f5c4a; --accent-ink:#fff; --warn:#8a5a00; --err:#a3261f; --ok:#1f6b3a;
+  --font:"Avenir Next","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121816;--panel:#1a2220;--ink:#e6ede9;--mute:#97a69d;--line:#2e3b36;--accent:#5fc2a0;--accent-ink:#0b1713;--warn:#e0b252;--err:#f08a82;--ok:#7fd49b}
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:290px 1fr;min-height:100%}
+aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-width:0}
+.brand{padding:18px 18px 12px;font-size:19px;font-weight:700;letter-spacing:-.01em}
+.brand small{display:block;font-weight:400;color:var(--mute);font-size:13px}
+.list{flex:1;overflow:auto;padding:6px 10px}
+.item{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:6px;padding:9px 10px;cursor:pointer}
+.item:hover{background:var(--bg)}
+.item[aria-current=true]{border-color:var(--accent);background:var(--bg)}
+.item b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item span{color:var(--mute);font-size:13px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{color:var(--mute);padding:10px}
+.conn{border-top:1px solid var(--line);padding:12px 14px;display:grid;gap:6px}
+.auth{max-width:380px;margin:12vh auto;padding:0 16px}
+main{padding:24px clamp(16px,4vw,44px) 60px;min-width:0;max-width:880px}
+h1{font-size:24px;margin:0 0 4px;letter-spacing:-.015em}
+h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--mute);margin:0 0 22px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:18px}
+label{display:block;font-weight:600;margin:12px 0 4px}
+label:first-child{margin-top:0}
+.hint{font-weight:400;color:var(--mute);font-size:13px}
+input[type=text],input[type=number],input[type=password],textarea,select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:8px 10px}
+textarea{resize:vertical;min-height:84px}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+button.p,button.s{border-radius:6px;padding:8px 16px;cursor:pointer;border:1px solid var(--accent)}
+button.p{background:var(--accent);color:var(--accent-ink);font-weight:600}
+button.s{background:none;color:var(--accent)}
+button.d{background:none;border:1px solid var(--line);color:var(--err);border-radius:6px;padding:8px 16px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.tool{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.tool:first-of-type{border-top:0}
+.tool input{margin-top:5px}
+.tool small{display:block;color:var(--mute)}
+.tool.off{opacity:.65}
+.tag{font-family:var(--mono);font-size:12px;color:var(--warn)}
+.status{min-height:22px;font-size:14px}
+.status.err{color:var(--err)}.status.ok{color:var(--ok)}
+.out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;margin-top:12px;font-size:14px;max-height:360px;overflow:auto}
+.notice{border-left:3px solid var(--warn);padding:6px 10px;margin:10px 0;color:var(--mute);font-size:14px}
+@media (max-width:760px){.app{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}.list{max-height:200px}.row{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<h1>Agent Factory Free</h1>
-<p>Backend en marcha. La interfaz web llegará en la Fase 2; mientras tanto, la API está en <code>/api/*</code>.</p>
-<p>Estado: <span id="s">comprobando…</span></p>
+<div class="auth" id="auth" hidden>
+  <section>
+    <h1 id="authT">Iniciar sesión</h1>
+    <p class="sub">Tus agentes son privados para tu cuenta.</p>
+    <label for="email">Correo</label><input type="text" id="email" autocomplete="email">
+    <label for="pw">Contraseña <span class="hint" id="pwHint"></span></label><input type="password" id="pw" autocomplete="current-password">
+    <div id="nameRow" hidden><label for="dn">Nombre <span class="hint">(opcional)</span></label><input type="text" id="dn" maxlength="80"></div>
+    <div class="btns"><button class="p" id="authGo">Entrar</button><button class="s" id="authSwap">Crear cuenta</button></div>
+    <div class="status" id="authSt" role="status"></div>
+  </section>
+</div>
+<div class="app" id="appRoot" hidden>
+<aside>
+  <div class="brand">Agent Builder<small>Tus agentes de IA</small></div>
+  <div class="btns" style="margin:0 14px 8px"><button class="p" id="new" style="width:100%">Crear agente</button></div>
+  <div class="list" id="list" aria-label="Lista de agentes"></div>
+  <div class="conn"><span id="who" class="hint"></span><button class="s" id="logout" hidden>Cerrar sesión</button></div>
+</aside>
+
+<main>
+  <h1 id="title">Nuevo agente</h1><p class="hint" id="meta"></p>
+  <p class="sub" id="sub">Describe qué necesitas y la IA propone una configuración. Tú la revisas antes de guardar.</p>
+
+  <section id="genBox">
+    <h2>Generar con IA</h2>
+    <label for="prompt">¿Qué debe hacer el agente? <span class="hint">(10 a 2000 caracteres)</span></label>
+    <textarea id="prompt" maxlength="2000" placeholder="Ej.: Un agente que resuma correos de clientes y proponga una respuesta cordial."></textarea>
+    <div class="btns"><button class="p" id="gen">Generar propuesta</button><span class="status" id="genSt" role="status"></span></div>
+  </section>
+
+  <section>
+    <h2>Configuración</h2>
+    <label for="name">Nombre</label><input type="text" id="name" maxlength="80">
+    <label for="description">Descripción</label><input type="text" id="description" maxlength="500">
+    <label for="role">Rol</label><input type="text" id="role" maxlength="200">
+    <label for="objective">Objetivo</label><textarea id="objective" style="min-height:60px"></textarea>
+    <label for="instructions">Instrucciones</label><textarea id="instructions" style="min-height:140px"></textarea>
+    <label for="capabilities">Capacidades <span class="hint">(una por línea)</span></label><textarea id="capabilities" style="min-height:70px"></textarea>
+
+    <label>Herramientas</label>
+    <div id="tools"></div>
+    <div class="notice" id="suggested" hidden></div>
+
+    <div class="row">
+      <div><label for="maxOutputTokens">Tokens máximos</label><input type="number" id="maxOutputTokens" min="100" max="8000" value="1500"></div>
+      <div><label for="timeoutSeconds">Tiempo límite (s)</label><input type="number" id="timeoutSeconds" min="5" max="60" value="45"></div>
+      <div><label for="reasoning">Razonamiento</label>
+        <select id="reasoning"><option value="default">Normal</option><option value="off">Desactivado (ahorra cuota)</option></select></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:14px"><input type="checkbox" id="requiresApproval"> Requiere aprobación antes de actuar</label>
+
+    <div class="btns">
+      <button class="p" id="save">Guardar agente</button>
+      <button class="s" id="toggle" hidden></button>
+      <button class="d" id="del" hidden>Eliminar</button>
+      <span class="status" id="saveSt" role="status"></span>
+    </div>
+  </section>
+
+  <section id="runBox" hidden>
+    <h2>Probar el agente</h2>
+    <label for="input">Mensaje de entrada</label>
+    <textarea id="input" placeholder="Escribe lo que quieres que procese el agente."></textarea>
+    <div class="btns"><button class="p" id="run">Ejecutar</button><span class="status" id="runSt" role="status"></span></div>
+    <div class="out" id="out" hidden></div>
+  </section>
+</main>
+</div>
+
 <script>
-fetch("/api/health").then(r => r.json()).then(j => { document.getElementById("s").textContent = j.ok ? "OK" : "con problemas"; })
-  .catch(() => { document.getElementById("s").textContent = "sin respuesta"; });
+const $ = id => document.getElementById(id);
+let TOOLS = [{id:"text_generation",name:"Generación de texto",description:"Razonamiento y redacción mediante el proveedor de IA.",availability:"available"}];
+let agents = [], current = null, currentStatus = null, fromAi = false, registering = false;
+
+async function api(method, path, body){
+  let res;
+  try { res = await fetch(path, {method, credentials:"same-origin", headers: body ? {"Content-Type":"application/json"} : {}, body: body ? JSON.stringify(body) : undefined}); }
+  catch { throw new Error("No se pudo conectar con el servidor."); }
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && !path.startsWith("/api/auth/login")) { showAuth(); throw new Error("Necesitas iniciar sesión."); }
+  if (!res.ok) throw new Error((data.error || "Error " + res.status) + (Array.isArray(data.issues) ? ": " + data.issues.join("; ") : ""));
+  return data;
+}
+function say(id, msg, kind){ const e=$(id); e.textContent=msg||""; e.className="status"+(kind?" "+kind:""); }
+
+/* ---- Acceso ---- */
+function showAuth(){ $("appRoot").hidden = true; $("auth").hidden = false; }
+function setMode(reg){
+  registering = reg;
+  $("authT").textContent = reg ? "Crear cuenta" : "Iniciar sesión";
+  $("authGo").textContent = reg ? "Crear cuenta" : "Entrar";
+  $("authSwap").textContent = reg ? "Ya tengo cuenta" : "Crear cuenta";
+  $("nameRow").hidden = !reg; $("pwHint").textContent = reg ? "(mínimo 10 caracteres)" : "";
+  $("pw").autocomplete = reg ? "new-password" : "current-password"; say("authSt");
+}
+$("authSwap").onclick = () => setMode(!registering);
+$("authGo").onclick = async () => {
+  say("authSt","Un momento…");
+  try{
+    const body = {email:$("email").value.trim(), password:$("pw").value};
+    if (registering) body.displayName = $("dn").value.trim();
+    const d = await api("POST", registering ? "/api/auth/register" : "/api/auth/login", body);
+    $("pw").value = ""; start(d.user);
+  }catch(e){ say("authSt", e.message, "err"); }
+};
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("authGo").click(); });
+$("logout").onclick = async () => { try{ await api("POST","/api/auth/logout"); }catch{} showAuth(); };
+
+async function start(user){
+  $("auth").hidden = true; $("appRoot").hidden = false;
+  $("who").textContent = user ? user.display_name : ""; $("logout").hidden = false;
+  try{ const s = await api("GET","/api/system/status"); if (Array.isArray(s.tools)) TOOLS = s.tools; }catch{}
+  fill({}, null); load();
+}
+
+/* ---- Formulario ---- */
+function renderTools(selected){
+  $("tools").innerHTML = TOOLS.map(t => {
+    const ok = t.availability === "available";
+    return `<label class="tool ${ok?"":"off"}" style="font-weight:400;margin:0">
+      <input type="checkbox" value="${t.id}" ${ok?"":"disabled"} ${selected.includes(t.id)?"checked":""}>
+      <span><b></b> ${ok?"":'<span class="tag">no disponible</span>'}<small></small></span></label>`;
+  }).join("");
+  document.querySelectorAll("#tools .tool").forEach((el,i) => {
+    el.querySelector("b").textContent = TOOLS[i].name;
+    el.querySelector("small").textContent = TOOLS[i].availability === "available" ? TOOLS[i].description : (TOOLS[i].unavailableReason || TOOLS[i].description);
+  });
+}
+const LABEL = {draft:"Borrador", active:"Activo", inactive:"Inactivo"};
+function fill(cfg, id, agent, suggested){
+  cfg = cfg || {};
+  $("name").value = cfg.name || ""; $("description").value = cfg.description || "";
+  $("role").value = cfg.role || ""; $("objective").value = cfg.objective || "";
+  $("instructions").value = cfg.instructions || "";
+  $("capabilities").value = (cfg.capabilities || []).join("\n");
+  const l = cfg.limits || {};
+  $("maxOutputTokens").value = l.maxOutputTokens || 1500; $("timeoutSeconds").value = l.timeoutSeconds || 45;
+  $("reasoning").value = l.reasoning || "default"; $("requiresApproval").checked = !!cfg.requiresApproval;
+  renderTools(cfg.tools || []);
+  const sug = (suggested || []).filter(x => x !== "text_generation");
+  $("suggested").hidden = !sug.length;
+  if (sug.length) $("suggested").textContent = "La IA sugirió: " + sug.join(", ") + ". Aún no están disponibles.";
+  current = id || null; currentStatus = agent ? agent.status : null; fromAi = false;
+  $("title").textContent = id ? (cfg.name || "Agente") : "Nuevo agente";
+  $("meta").textContent = agent ? `${LABEL[agent.status] || agent.status} · versión ${agent.current_version}` : "";
+  $("sub").textContent = id ? "Cada cambio que guardes crea una versión nueva." : "Describe qué necesitas y la IA propone una configuración. Tú la revisas antes de guardar.";
+  $("genBox").hidden = !!id; $("del").hidden = !id; $("runBox").hidden = !id;
+  $("toggle").hidden = !id; if (id) $("toggle").textContent = agent.status === "active" ? "Desactivar" : "Activar";
+  $("save").textContent = id ? "Guardar nueva versión" : "Guardar agente";
+  $("out").hidden = true; say("saveSt"); say("genSt"); say("runSt");
+  document.querySelectorAll(".item").forEach(b => b.setAttribute("aria-current", String(b.dataset.id === id)));
+}
+function collect(){
+  return {
+    name: $("name").value.trim(), description: $("description").value.trim(),
+    role: $("role").value.trim(), objective: $("objective").value.trim(), instructions: $("instructions").value.trim(),
+    capabilities: $("capabilities").value.split("\n").map(s=>s.trim()).filter(Boolean),
+    tools: [...document.querySelectorAll("#tools input:checked")].map(i=>i.value),
+    limits: { maxOutputTokens:+$("maxOutputTokens").value, timeoutSeconds:+$("timeoutSeconds").value, reasoning:$("reasoning").value },
+    requiresApproval: $("requiresApproval").checked
+  };
+}
+
+/* ---- Lista y detalle ---- */
+async function load(selectId){
+  try{
+    agents = (await api("GET","/api/agents")).agents || [];
+    $("list").innerHTML = agents.length ? agents.map(a => '<button class="item"><b></b><span></span></button>').join("") : '<div class="empty">Aún no tienes agentes. Crea el primero.</div>';
+    document.querySelectorAll(".item").forEach((b,i) => {
+      const a = agents[i]; b.dataset.id = a.id;
+      b.querySelector("b").textContent = a.name;
+      b.querySelector("span").textContent = (LABEL[a.status] || a.status) + (a.description ? " · " + a.description : "");
+      b.onclick = () => open(a.id);
+      b.setAttribute("aria-current", String(a.id === selectId));
+    });
+  }catch(e){ $("list").innerHTML = '<div class="empty"></div>'; $("list").firstChild.textContent = e.message; }
+}
+async function open(id){
+  try{
+    const d = await api("GET","/api/agents/" + id);
+    const v = d.versions.find(x => x.version === d.agent.current_version) || d.versions[0];
+    fill(v.config, id, d.agent);
+  }catch(e){ say("saveSt", e.message, "err"); }
+}
+$("new").onclick = () => fill({}, null);
+
+$("gen").onclick = async () => {
+  const p = $("prompt").value.trim();
+  if (p.length < 10) return say("genSt","Escribe al menos 10 caracteres.","err");
+  $("gen").disabled = true; say("genSt","Generando… puede tardar unos segundos.");
+  try{
+    const d = await api("POST","/api/agents/generate",{prompt:p});
+    fill(d.config, null, null, d.suggestedTools); fromAi = true; $("genBox").hidden = false;
+    say("genSt","Propuesta lista. Activa «Generación de texto» y guarda cuando estés conforme.","ok");
+  }catch(e){ say("genSt", e.message, "err"); }
+  $("gen").disabled = false;
+};
+
+$("save").onclick = async () => {
+  $("save").disabled = true; say("saveSt","Guardando…");
+  try{
+    const cfg = collect();
+    if (current){ await api("POST","/api/agents/"+current+"/versions",{config:cfg}); await load(current); await open(current); say("saveSt","Versión guardada.","ok"); }
+    else { const d = await api("POST","/api/agents",{config:cfg, source: fromAi ? "ai" : "manual"}); await load(d.id); await open(d.id); say("saveSt","Agente guardado. Actívalo para poder ejecutarlo.","ok"); }
+  }catch(e){ say("saveSt", e.message, "err"); }
+  $("save").disabled = false;
+};
+$("toggle").onclick = async () => {
+  try{
+    await api("POST","/api/agents/"+current+"/status",{status: currentStatus === "active" ? "inactive" : "active"});
+    await load(current); await open(current); say("saveSt","Estado actualizado.","ok");
+  }catch(e){ say("saveSt", e.message, "err"); }
+};
+$("del").onclick = async () => {
+  if (!current || !confirm("¿Eliminar este agente? Esta acción no se puede deshacer.")) return;
+  try{ await api("DELETE","/api/agents/"+current); await load(); fill({}, null); }catch(e){ say("saveSt", e.message, "err"); }
+};
+
+$("run").onclick = async () => {
+  const input = $("input").value.trim();
+  if (!input) return say("runSt","Escribe un mensaje de entrada.","err");
+  $("run").disabled = true; say("runSt","Ejecutando…"); $("out").hidden = true;
+  try{
+    const r = await api("POST","/api/executions",{agentId:current, input});
+    const d = await api("GET","/api/executions/"+r.id);
+    const ex = d.execution;
+    if (ex.status === "awaiting_approval"){ say("runSt","Esperando aprobación: este agente requiere que apruebes antes de ejecutar.","ok"); }
+    else {
+      $("out").textContent = ex.status === "completed" ? ex.output : (ex.error || "La ejecución terminó con estado " + ex.status + ".");
+      $("out").hidden = false;
+      say("runSt", ex.status === "completed" ? "Completada" + (ex.model ? " con " + ex.model : "") + "." : "Falló.", ex.status === "completed" ? "ok" : "err");
+    }
+  }catch(e){ say("runSt", e.message, "err"); }
+  $("run").disabled = false;
+};
+
+(async () => {
+  try{ const d = await api("GET","/api/auth/me"); start(d.user); }
+  catch{ showAuth(); }
+})();
 </script>
 </body>
 </html>
+
