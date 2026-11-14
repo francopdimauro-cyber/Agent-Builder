@@ -1,0 +1,26 @@
+# Nombre propio: no reutilices el de ningún Worker que ya tengas.
+name = "agent-factory-free"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+
+# Los archivos de public/ los sirve Cloudflare; solo /api/* pasa por el Worker.
+[assets]
+directory = "./public"
+run_worker_first = ["/api/*"]
+
+# Toda la app y su base de datos SQLite viven en un único Durable Object.
+[[durable_objects.bindings]]
+name = "AGENT_FACTORY"
+class_name = "AgentFactory"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AgentFactory"]
+
+[vars]
+COOKIE_SECURE = "true"
+# Ponlo en "false" cuando hayas creado tu cuenta: si no, cualquiera con la URL podría registrarse y gastar tu cuota de NVIDIA.
+ALLOW_REGISTRATION = "true"
+# AI_MODELS = "nvidia/nemotron-3-super-120b-a12b,nvidia/nemotron-3-ultra-550b-a55b,nvidia/nemotron-3.5-super-vl-120b-a12b"
+
+# La clave NO va aquí: se guarda como secreto (NVIDIA_API_KEY). Ver README, sección «Despliegue en Cloudflare».

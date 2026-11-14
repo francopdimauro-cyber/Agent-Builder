@@ -3,7 +3,7 @@
 Réplica propia y gratuita de *Agent Factory*: diseña agentes de IA (rol, objetivo, instrucciones, herramientas),
 ejecútalos, encadénalos en flujos y supervisa todo con aprobaciones humanas y auditoría.
 
-**Sin dependencias de pago ni de runtime**: Node ≥ 22.18, SQLite integrado (`node:sqlite`) y la API de NVIDIA (modelos Nemotron).
+**Sin dependencias de runtime**: corre en Node ≥ 22.18 (SQLite integrado, `node:sqlite`) **o en Cloudflare Workers** (Durable Object con SQLite), con la API de NVIDIA (modelos Nemotron).
 
 > **Estado: Fase 1 — backend completo y probado.** La interfaz web es la Fase 2.
 
@@ -17,6 +17,30 @@ npm test                    # 32 tests (usan un NVIDIA simulado: no gastan cuota
 ```
 
 `npm install` solo hace falta para `npm run typecheck` (TypeScript y tipos de Node).
+
+## Despliegue en Cloudflare Workers (desde GitHub)
+
+La app entera vive en **un Durable Object con almacenamiento SQLite** (`src/worker.ts`), así que conserva la base de datos
+síncrona, las transacciones y el trigger de versiones inmutables. Las rutas `/api/*` pasan por el Worker; `public/` lo sirve Cloudflare.
+
+1. **Sube el repo a GitHub** (`.env` y `.dev.vars` están en `.gitignore`).
+2. En el panel de Cloudflare: **Workers & Pages → Create → Import a repository** y elige el repo.
+   - Nombre del Worker: el de `wrangler.toml` (`agent-factory-free`). Usa un nombre **nuevo**; no reutilices Workers existentes.
+   - Comando de build: *(vacío)* · Comando de despliegue: `npx wrangler deploy`
+3. En el Worker → **Settings → Variables and Secrets → Add** → tipo **Secret**, nombre `NVIDIA_API_KEY`, valor tu clave `nvapi-…`.
+   Vuelve a desplegar (o pulsa *Deploy*) para que la tome.
+4. Abre la URL `https://agent-factory-free.<tu-subdominio>.workers.dev`: la página debe mostrar «Estado: OK».
+5. Crea tu cuenta (`POST /api/auth/register`) y **después** pon `ALLOW_REGISTRATION = "false"` en `wrangler.toml` y haz push,
+   para que nadie más pueda registrarse y gastar tu cuota de NVIDIA.
+
+Cada `git push` a `main` vuelve a desplegar. Probar en local con Workers: `npm install`, copia `.dev.vars.example` a `.dev.vars`
+con tu clave y ejecuta `npm run cf:dev`.
+
+Notas del despliegue:
+- **Plan:** el hash de contraseñas (PBKDF2, 100 000 iteraciones) y las llamadas lentas a modelos grandes pueden superar el límite
+  de CPU del plan gratuito de Workers (10 ms). Si registro o login fallan con «Exceeded CPU», usa el plan Workers de pago.
+- **Una sola instancia:** todas las peticiones pasan por un único Durable Object (pensado para uso personal o de equipo pequeño).
+- Los datos viven en el Durable Object; para borrarlos hay que eliminar el Worker o cambiar la clase en una migración de Wrangler.
 
 ## IA: principal + respaldo
 
@@ -59,7 +83,7 @@ sus ejecuciones vivas, control de CSRF por origen, y límite de tamaño de cuerp
 
 ## Limitaciones conocidas
 
-- `node:sqlite` sigue marcado como experimental en Node 22 (funciona; la API podría cambiar).
+- `node:sqlite` (solo al ejecutar en Node) sigue marcado como experimental en Node 22.
 - Las ejecuciones se resuelven dentro de la petición HTTP (igual que el original). Sin cola en segundo plano.
 - Los límites de la capa gratuita de NVIDIA varían por cuenta: consúltalos en build.nvidia.com.
 - Si expones el servidor fuera de localhost, ponlo detrás de HTTPS y activa `COOKIE_SECURE=true`.

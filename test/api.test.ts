@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { exec, q1 } from "../src/db/index.ts";
 import { recoverInterrupted } from "../src/engine/engine.ts";
 import { AGENT, Client, okBody, startApp, startMock, type TestApp } from "./helpers.ts";
 
@@ -109,7 +110,7 @@ test("versiones inmutables: editar crea v2, ejecuta la actual y el trigger impid
   assert.deepEqual(detail.json.versions.map((v: any) => v.version), [2, 1]);
   assert.equal(detail.json.versions[1].config.name, "Redactor");
 
-  assert.throws(() => app.db.prepare("update agent_versions set config = '{}' where agent_id = ?").run(id), /inmutable/);
+  assert.throws(() => exec(app.db, "update agent_versions set config = '{}' where agent_id = ?", id), /inmutable/);
   const run = await c.post("/api/executions", { agentId: id, input: "x" });
   assert.equal((await c.get(`/api/executions/${run.json.id}`)).json.execution.agent_version, 2);
 });
@@ -309,10 +310,8 @@ test("supervisor: máximo 5 ejecuciones activas simultáneas", async () => {
 test("recuperación al arrancar: lo que estaba en vuelo se marca fallido", async () => {
   const c = await newUser("rec@x.com");
   const id = await activeAgent(c);
-  const user = app.db.prepare("select id from users where email = 'rec@x.com'").get() as { id: string };
-  app.db
-    .prepare("insert into executions (id, owner_id, agent_id, agent_version, status, input) values ('11111111-1111-4111-8111-111111111111', ?, ?, 1, 'running', 'x')")
-    .run(user.id, id);
+  const user = q1<{ id: string }>(app.db, "select id from users where email = 'rec@x.com'")!;
+  exec(app.db, "insert into executions (id, owner_id, agent_id, agent_version, status, input) values ('11111111-1111-4111-8111-111111111111', ?, ?, 1, 'running', 'x')", user.id, id);
   assert.equal(recoverInterrupted(app.db), 1);
   const d = await c.get("/api/executions/11111111-1111-4111-8111-111111111111");
   assert.equal(d.json.execution.status, "failed");

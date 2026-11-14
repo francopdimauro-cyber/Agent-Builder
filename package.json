@@ -1,19 +1,24 @@
 {
   "name": "agent-factory-free",
   "version": "0.1.0",
-  "description": "Fábrica de agentes de IA: réplica propia, sin dependencias de pago (SQLite + NVIDIA).",
+  "description": "Fábrica de agentes de IA: réplica propia (SQLite + NVIDIA). Corre en Node o en Cloudflare Workers.",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/main.ts",
     "dev": "node --watch --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/main.ts",
     "models": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/scripts/list-models.ts",
     "test": "node --test --disable-warning=ExperimentalWarning \"test/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@types/node": "^22.16.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "wrangler": "^4.0.0"
   }
 }

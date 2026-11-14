@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "../util/id.ts";
 import { AiProviderError } from "../ai/provider.ts";
 import type { Ctx } from "../context.ts";
 import { exec, nowIso, q, q1, tx, type Db, type Param } from "../db/index.ts";

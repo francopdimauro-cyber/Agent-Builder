@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "../util/id.ts";
 import type { Ctx } from "../context.ts";
 import { exec, nowIso, q, q1, tx } from "../db/index.ts";
 import type { AgentRow } from "../db/types.ts";

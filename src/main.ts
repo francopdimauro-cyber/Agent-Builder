@@ -1,6 +1,6 @@
 import { findUnknownModels, providerFromConfig } from "./ai/provider.ts";
 import { loadConfig } from "./config.ts";
-import { openDb } from "./db/index.ts";
+import { openDb } from "./db/node.ts";
 import { recoverInterrupted } from "./engine/engine.ts";
 import { createApp } from "./http/server.ts";
 

@@ -1,33 +1,33 @@
-import { createHash, randomBytes } from "node:crypto";
 import { exec, nowIso, q1, type Db } from "../db/index.ts";
 import type { UserRow } from "../db/types.ts";
+import { randomBytes, toBase64Url, toHex } from "../util/bytes.ts";
 
 export const COOKIE_NAME = "af_session";
 
-const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+const sha256 = async (s: string): Promise<string> => toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s))));
 
 /** Crea una sesión y devuelve el token en claro (solo se guarda su hash). */
-export function createSession(db: Db, userId: string, ttlDays: number): { token: string; expiresAt: Date } {
-  const token = randomBytes(32).toString("base64url");
+export async function createSession(db: Db, userId: string, ttlDays: number): Promise<{ token: string; expiresAt: Date }> {
+  const token = toBase64Url(randomBytes(32));
   const expiresAt = new Date(Date.now() + ttlDays * 86_400_000);
-  exec(db, "insert into sessions (id, user_id, expires_at) values (?,?,?)", sha256(token), userId, expiresAt.toISOString());
+  exec(db, "insert into sessions (id, user_id, expires_at) values (?,?,?)", await sha256(token), userId, expiresAt.toISOString());
   exec(db, "delete from sessions where expires_at < ?", nowIso()); // limpieza oportunista
   return { token, expiresAt };
 }
 
-export function getUserBySession(db: Db, token: string): Omit<UserRow, "password_hash"> | undefined {
+export async function getUserBySession(db: Db, token: string): Promise<Omit<UserRow, "password_hash"> | undefined> {
   return q1(
     db,
     `select u.id, u.email, u.display_name, u.language, u.created_at
        from sessions s join users u on u.id = s.user_id
       where s.id = ? and s.expires_at > ?`,
-    sha256(token),
+    await sha256(token),
     nowIso(),
   );
 }
 
-export function deleteSession(db: Db, token: string): void {
-  exec(db, "delete from sessions where id = ?", sha256(token));
+export async function deleteSession(db: Db, token: string): Promise<void> {
+  exec(db, "delete from sessions where id = ?", await sha256(token));
 }
 
 export function parseCookies(header: string | undefined): Record<string, string> {

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Factory Free</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; color: #1a1a1a; }
+  code { background: #eee; padding: .1em .35em; border-radius: 4px; }
+  #s { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Agent Factory Free</h1>
+<p>Backend en marcha. La interfaz web llegará en la Fase 2; mientras tanto, la API está en <code>/api/*</code>.</p>
+<p>Estado: <span id="s">comprobando…</span></p>
+<script>
+fetch("/api/health").then(r => r.json()).then(j => { document.getElementById("s").textContent = j.ok ? "OK" : "con problemas"; })
+  .catch(() => { document.getElementById("s").textContent = "sin respuesta"; });
+</script>
+</body>
+</html>

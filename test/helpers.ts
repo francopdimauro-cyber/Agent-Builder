@@ -2,7 +2,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { providerFromConfig, type AiProvider } from "../src/ai/provider.ts";
 import { loadConfig } from "../src/config.ts";
-import { openDb, type Db } from "../src/db/index.ts";
+import type { Db } from "../src/db/index.ts";
+import { openDb } from "../src/db/node.ts";
 import { createApp } from "../src/http/server.ts";
 
 export interface MockCall {

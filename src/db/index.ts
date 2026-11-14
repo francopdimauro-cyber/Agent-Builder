@@ -1,60 +1,54 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { MIGRATIONS } from "./migrations.ts";
 
-export type Db = DatabaseSync;
 export type Param = null | number | bigint | string | Uint8Array;
 
-export function openDb(path: string): Db {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
-  migrate(db);
-  return db;
-}
-
-function migrate(db: Db): void {
-  const row = db.prepare("PRAGMA user_version").get() as { user_version: number };
-  for (let v = row.user_version; v < MIGRATIONS.length; v++) {
-    db.exec("BEGIN");
-    try {
-      db.exec(MIGRATIONS[v]!);
-      db.exec(`PRAGMA user_version = ${v + 1}`);
-      db.exec("COMMIT");
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    }
-  }
+/**
+ * Interfaz mínima y SÍNCRONA de base de datos. Tiene dos implementaciones:
+ *  - db/node.ts: `node:sqlite` (desarrollo local, tests y ejecución en Node).
+ *  - db/durable.ts: SQLite de un Durable Object (Cloudflare Workers).
+ * Este archivo no importa nada específico de ninguna plataforma.
+ */
+export interface Db {
+  /** Todas las filas de una consulta. */
+  all(sql: string, params: Param[]): Record<string, unknown>[];
+  /** Ejecuta INSERT/UPDATE/DELETE y devuelve las filas afectadas. */
+  run(sql: string, params: Param[]): number;
+  /** Ejecuta un script con varias sentencias (sin parámetros). */
+  script(sql: string): void;
+  /** Transacción síncrona (sin await dentro ni anidamiento). */
+  transaction<T>(fn: () => T): T;
 }
 
 /** Todas las filas de una consulta. */
 export function q<T = Record<string, unknown>>(db: Db, sql: string, ...params: Param[]): T[] {
-  return db.prepare(sql).all(...params) as T[];
+  return db.all(sql, params) as T[];
 }
 
 /** Una fila o undefined. */
 export function q1<T = Record<string, unknown>>(db: Db, sql: string, ...params: Param[]): T | undefined {
-  return db.prepare(sql).get(...params) as T | undefined;
+  return db.all(sql, params)[0] as T | undefined;
 }
 
 /** Ejecuta INSERT/UPDATE/DELETE y devuelve las filas afectadas. */
 export function exec(db: Db, sql: string, ...params: Param[]): number {
-  return Number(db.prepare(sql).run(...params).changes);
+  return db.run(sql, params);
 }
 
 /** Transacción síncrona (no admite await dentro ni anidamiento). */
 export function tx<T>(db: Db, fn: () => T): T {
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    const result = fn();
-    db.exec("COMMIT");
-    return result;
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
+  return db.transaction(fn);
 }
 
 export const nowIso = (): string => new Date().toISOString();
+
+/** Aplica las migraciones pendientes. La versión se guarda en la tabla `_meta` (portable entre motores). */
+export function migrate(db: Db): void {
+  db.script("create table if not exists _meta (key text primary key, value text not null)");
+  const row = q1<{ value: string }>(db, "select value from _meta where key = 'schema_version'");
+  for (let v = Number(row?.value ?? 0); v < MIGRATIONS.length; v++) {
+    db.transaction(() => {
+      db.script(MIGRATIONS[v]!);
+      db.run("insert into _meta (key, value) values ('schema_version', ?) on conflict(key) do update set value = excluded.value", [String(v + 1)]);
+    });
+  }
+}

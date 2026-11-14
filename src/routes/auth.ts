@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "../util/id.ts";
 import { dummyHash, hashPassword, verifyPassword } from "../auth/password.ts";
 import { clearCookie, COOKIE_NAME, createSession, deleteSession, LoginLimiter, parseCookies, sessionCookie } from "../auth/session.ts";
 import type { Ctx } from "../context.ts";
@@ -32,7 +32,7 @@ export function registerAuthRoutes(router: Router, ctx: Ctx): void {
     const id = randomUUID();
     exec(db, "insert into users (id, email, password_hash, display_name) values (?,?,?,?)", id, email, await hashPassword(password), displayName);
     audit(db, id, "user.register", "user", id);
-    const { token, expiresAt } = createSession(db, id, config.sessionTtlDays);
+    const { token, expiresAt } = await createSession(db, id, config.sessionTtlDays);
     const user = q1<Omit<UserRow, "password_hash">>(db, "select id, email, display_name, language, created_at from users where id = ?", id)!;
     return json({ user: publicUser(user) }, 201, { "Set-Cookie": sessionCookie(token, expiresAt, config.cookieSecure) });
   });
@@ -55,13 +55,13 @@ export function registerAuthRoutes(router: Router, ctx: Ctx): void {
     }
     limiter.reset(key);
     audit(db, row.id, "user.login", "user", row.id);
-    const { token, expiresAt } = createSession(db, row.id, config.sessionTtlDays);
+    const { token, expiresAt } = await createSession(db, row.id, config.sessionTtlDays);
     return json({ user: publicUser(row) }, 200, { "Set-Cookie": sessionCookie(token, expiresAt, config.cookieSecure) });
   });
 
-  router.addPublic("POST", "/api/auth/logout", (req) => {
+  router.addPublic("POST", "/api/auth/logout", async (req) => {
     const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
-    if (token) deleteSession(db, token);
+    if (token) await deleteSession(db, token);
     return json({ ok: true }, 200, { "Set-Cookie": clearCookie(config.cookieSecure) });
   });
 

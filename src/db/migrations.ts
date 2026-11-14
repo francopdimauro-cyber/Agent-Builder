@@ -1,5 +1,5 @@
 /**
- * Migraciones versionadas con PRAGMA user_version. Añade nuevas entradas al final; no edites las existentes.
+ * Migraciones versionadas (versión guardada en la tabla _meta). Añade nuevas entradas al final; no edites las existentes.
  * Sustituye a las políticas RLS de Postgres: aquí TODA consulta debe filtrar por owner_id (ver engine y routes).
  */
 const TS = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";

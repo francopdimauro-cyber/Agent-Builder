@@ -1,4 +1,3 @@
-import type { IncomingHttpHeaders } from "node:http";
 import type { UserRow } from "../db/types.ts";
 
 export type User = Omit<UserRow, "password_hash">;
@@ -10,7 +9,8 @@ export interface Req {
   body: unknown;
   user: User | null;
   ip: string;
-  headers: IncomingHttpHeaders;
+  /** Cabeceras en minúsculas (p. ej. `cookie`). */
+  headers: Record<string, string | undefined>;
 }
 
 export interface Res {
