@@ -8,6 +8,7 @@ import { addEvent, audit, createExecution, runExecution } from "../engine/engine
 import { AppError } from "../errors.ts";
 import { json, type Req, type Res, type Router } from "../http/router.ts";
 import { randomUUID } from "../util/id.ts";
+import { getEnabledTools } from "./business-tools.ts";
 
 /*
  * Chat público embebible: permite que los visitantes de una web hablen con un agente sin iniciar sesión.
@@ -285,7 +286,66 @@ export function registerPublicChatRoutes(router: Router, ctx: Ctx): void {
         suggestions: JSON.parse(chat.suggestions) as string[],
         privacyNotice: chat.privacy_notice,
         available: chat.enabled === 1 && agent?.status === "active",
+        ...(getEnabledTools(ctx,chat.owner_id,chat.agent_id).includes("lead_capture") ? { contactEnabled:true } : {}),
       });
+    }),
+  );
+
+  // Herramienta real: registro de solicitudes con consentimiento expreso.
+  // El modelo NO puede guardar datos por sí solo; solo el formulario del visitante llama esta ruta.
+  router.addPublic(
+    "OPTIONS",
+    "/api/public/chats/:id/leads",
+    publicRoute(() => ({
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "600",
+      },
+    })),
+  );
+  router.addPublic(
+    "POST",
+    "/api/public/chats/:id/leads",
+    publicRoute(async (req, chat) => {
+      if(chat.enabled!==1 || !getEnabledTools(ctx,chat.owner_id,chat.agent_id).includes("lead_capture"))
+        throw new AppError(403,"Este chat no admite solicitudes de contacto.");
+      const o=asObject(req.body);
+      const c=new Checker();
+      const name=c.string(o["name"],"name",{min:2,max:100}).trim();
+      const email=c.string(o["email"],"email",{min:5,max:254}).trim().toLowerCase();
+      const message=c.string(o["message"],"message",{min:5,max:1500}).trim();
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))c.issues.push("email: dirección no válida");
+      if(o["consent"]!==true)c.issues.push("consent: debes autorizar el envío de tus datos al negocio.");
+      if(typeof o["website"]==="string"&&o["website"]!=="")c.issues.push("website: solicitud no válida.");
+      c.done();
+      const visitor=await visitorKey(chat.id,req.ip);
+      const now=Date.now();
+      const hour=60*60*1000;
+      const day=24*hour;
+      const id=randomUUID();
+      tx(db,()=>{
+        // Límite por IP anonimizada y por chat. Evita que los formularios se usen para spam.
+        const recent=q1<{n:number}>(db,
+          "select count(*) as n from contact_lead_hits where chat_id = ? and visitor = ? and at > ?",
+          chat.id,visitor,now-hour)?.n??0;
+        if(recent>=3)throw new AppError(429,"Has enviado demasiadas solicitudes. Inténtalo más tarde.");
+        const daily=q1<{n:number}>(db,
+          "select count(*) as n from contact_leads where chat_id = ? and created_at >= ?",
+          chat.id,new Date(now-day).toISOString())?.n??0;
+        if(daily>=50)throw new AppError(429,"El formulario ha alcanzado el límite diario.");
+        exec(db,
+          "insert into contact_leads(id,owner_id,agent_id,chat_id,name,email,message,consent_at) values(?,?,?,?,?,?,?,?)",
+          id,chat.owner_id,chat.agent_id,chat.id,name,email,message,new Date(now).toISOString());
+        exec(db,"insert into contact_lead_hits(chat_id,visitor,at) values(?,?,?)",chat.id,visitor,now);
+        exec(db,"delete from contact_lead_hits where chat_id = ? and at < ?",chat.id,now-day);
+        // Minimización de datos: retención máxima de 90 días.
+        exec(db,"delete from contact_leads where owner_id = ? and created_at < ?",chat.owner_id,
+          new Date(now-90*day).toISOString());
+      });
+      audit(db,chat.owner_id,"lead.created","contact_lead",id,{chat_id:chat.id});
+      return json({ok:true,requestId:id},201);
     }),
   );
 
