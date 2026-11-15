@@ -20,7 +20,7 @@ new_sqlite_classes = ["AgentFactory"]
 [vars]
 COOKIE_SECURE = "true"
 # Ponlo en "false" cuando hayas creado tu cuenta: si no, cualquiera con la URL podría registrarse y gastar tu cuota de NVIDIA.
-ALLOW_REGISTRATION = "true"
+ALLOW_REGISTRATION = "false"
 # AI_MODELS = "nvidia/nemotron-3-super-120b-a12b,nvidia/nemotron-3-ultra-550b-a55b,nvidia/nemotron-3.5-super-vl-120b-a12b"
 
 # La clave NO va aquí: se guarda como secreto (NVIDIA_API_KEY). Ver README, sección «Despliegue en Cloudflare».
