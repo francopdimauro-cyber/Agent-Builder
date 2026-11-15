@@ -3,6 +3,7 @@ import { COOKIE_NAME, getUserBySession, parseCookies } from "../auth/session.ts"
 import type { Ctx } from "../context.ts";
 import { ValidationError } from "../domain/validate.ts";
 import { AppError } from "../errors.ts";
+import { registerBusinessToolRoutes } from "../routes/business-tools.ts";
 import { registerAuthRoutes } from "../routes/auth.ts";
 import { registerRecoveryRoutes } from "../routes/recovery.ts";
 import { registerAgentRoutes } from "../routes/agents.ts";
@@ -43,6 +44,7 @@ export function createHandler(ctx: Ctx): (request: Request, info?: RequestInfo) 
   registerRecoveryRoutes(router, ctx);
   registerSystemRoutes(router, ctx);
   registerAgentRoutes(router, ctx);
+  registerBusinessToolRoutes(router, ctx);
   registerExecutionRoutes(router, ctx);
   registerWorkflowRoutes(router, ctx);
   registerPublicChatRoutes(router, ctx);
