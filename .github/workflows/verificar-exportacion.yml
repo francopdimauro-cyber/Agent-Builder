@@ -1,0 +1,34 @@
+name: Verificar exportacion ZIP de agentes independientes
+on:
+  push:
+    branches:
+      - feature/exportar-agentes-independientes-20261115
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Instalar dependencias
+        run: npm install
+      - name: Validar proyecto Agent Builder
+        run: |
+          npm run typecheck
+          npm test
+      - name: Tests del exportador ZIP
+        run: |
+          node --check public/export/exporter.mjs
+          node --test test/export-standalone.test.mjs
+      - name: Verificar estructura ZIP y compilar Worker independiente
+        run: |
+          unzip -t .export-ci/example.zip
+          mkdir -p .export-ci/independent
+          unzip -q .export-ci/example.zip -d .export-ci/independent
+          node --check .export-ci/independent/src/worker.mjs
+          cd .export-ci/independent
+          ../../node_modules/.bin/wrangler deploy --dry-run
