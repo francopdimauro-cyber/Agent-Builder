@@ -78,6 +78,9 @@ function fill(cfg, id, agent, suggested){
   $("genBox").hidden = !!id; $("del").hidden = !id; $("runBox").hidden = !id;
   $("exportBox").hidden = !id;
   $("exportZip").disabled = !id || agent?.status !== "active";
+  $("deployCf").disabled = !id || agent?.status !== "active";
+  $("deployInfo").hidden = true;
+  say("deployStatus");
   $("exportDomain").value = "";
   say("exportStatus");
   $("toggle").hidden = !id; if (id) $("toggle").textContent = agent.status === "active" ? "Desactivar" : "Activar";
@@ -116,6 +119,45 @@ $("exportZip").onclick = async () => {
     say("exportStatus", e.message || "No se pudo generar el ZIP.", "err");
   } finally {
     $("exportZip").disabled = currentStatus !== "active";
+  }
+};
+
+/* ---- Despliegue de un Worker independiente desde el backend ---- */
+$("deployCf").onclick = async () => {
+  if (!current || currentStatus !== "active") return;
+  if (!confirm("Se creará un Worker nuevo y una base de datos aislada en tu cuenta Cloudflare. Las credenciales de IA de cada cliente se añaden por separado. ¿Continuar?")) return;
+  $("deployCf").disabled = true;
+  $("deployInfo").hidden = true;
+  say("deployStatus", "Publicando agente independiente en Cloudflare...");
+  try {
+    const data = await api("POST", "/api/deploy/agent", {
+      agentId: current,
+      siteOrigin: $("exportDomain").value.trim()
+    });
+    if (typeof data.workerUrl !== "string" || !/^https:\/\/[a-z0-9.-]+\.workers\.dev$/.test(data.workerUrl)) {
+      throw Error("Cloudflare devolvió una URL no válida.");
+    }
+    const script = '<script src="' + data.workerUrl + '/widget.js" data-chat="' + data.chatId + '" defer></' + 'script>';
+    $("deployName").textContent = "Agente: " + data.workerName;
+    $("deployWorkerUrl").textContent = data.workerUrl;
+    $("deployWorkerUrl").href = data.workerUrl + "/api/health";
+    $("deployEmbed").value = script;
+    $("deployInfo").hidden = false;
+    say("deployStatus", "Worker creado. Recuerda añadir NVIDIA_API_KEY a los secretos de ESTE Worker antes de probar su IA.", "ok");
+  } catch (error) {
+    say("deployStatus", error.message || "No se ha podido publicar el agente.", "err");
+  } finally {
+    $("deployCf").disabled = currentStatus !== "active";
+  }
+};
+$("deployCopy").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("deployEmbed").value);
+    say("deployStatus", "Código copiado. Pégalo en la web autorizada.", "ok");
+  } catch {
+    $("deployEmbed").focus();
+    $("deployEmbed").select();
+    say("deployStatus", "Selecciona el código y cópialo manualmente.", "err");
   }
 };
 
