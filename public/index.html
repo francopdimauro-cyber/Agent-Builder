@@ -158,6 +158,20 @@ button:disabled{opacity:.5;cursor:not-allowed}
     </div>
   </section>
 
+
+  <section id="exportBox" hidden>
+    <h2>Entregar este agente como ZIP independiente</h2>
+    <p class="hint">Genera un proyecto desplegable para una sola web: Worker, base SQLite propia, widget y guía. No depende del backend de Agent Builder.</p>
+    <label for="exportDomain">Dominio HTTPS autorizado del cliente</label>
+    <input type="text" id="exportDomain" placeholder="https://www.tucliente.es" autocomplete="off" spellcheck="false">
+    <p class="hint">Debe ser la dirección exacta de su web, sin rutas. Si todavía no tiene dominio, puedes usar la URL provisional de Workers.</p>
+    <div class="btns">
+      <button class="p" type="button" id="exportZip">Descargar ZIP independiente</button>
+      <span class="status" id="exportStatus" role="status"></span>
+    </div>
+    <p class="notice">El ZIP no incluye contraseñas ni claves de IA. Cada cliente configura la suya en Cloudflare. Solo funciona con agentes activos que utilicen Generación de texto y no exijan aprobación humana.</p>
+  </section>
+
   <section id="runBox" hidden>
     <h2>Probar el agente</h2>
     <label for="input">Mensaje de entrada</label>
