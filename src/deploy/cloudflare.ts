@@ -31,9 +31,11 @@ const API = "https://api.cloudflare.com/client/v4";
 const COMPAT_DATE = "2026-11-15";
 
 export class DeploymentError extends Error {
-  constructor(public status: number, message: string) {
+  status: number;
+  constructor(status: number, message: string) {
     super(message);
     this.name = "DeploymentError";
+    this.status = status;
   }
 }
 export function siteOrigin(input: string): string {
@@ -83,7 +85,7 @@ function failCode(result: unknown): string {
 }
 async function cloudflareRequest(
   f: typeof fetch, token: string, path: string,
-  options: { method?: string; body?: BodyInit; contentType?: string } = {},
+  options: { method?: string; body?: string | FormData; contentType?: string } = {},
 ): Promise<{ status: number; success: boolean; data: Record<string, unknown> }> {
   const res = await f(API + path, {
     method: options.method ?? "GET",
