@@ -21,6 +21,20 @@ export const TOOL_CATALOG: readonly ToolDefinition[] = [
     requiredPermission: "ai.generate",
   },
   {
+    id: "site_knowledge",
+    name: "Información verificada del negocio",
+    description: "Busca respuestas en la base de conocimientos del agente, configurada y revisada por el propietario.",
+    availability: "available",
+    requiredPermission: "knowledge.read",
+  },
+  {
+    id: "lead_capture",
+    name: "Recibir solicitudes de contacto",
+    description: "Muestra un formulario de contacto con consentimiento y guarda las solicitudes en la base de datos del propietario.",
+    availability: "available",
+    requiredPermission: "leads.create",
+  },
+  {
     id: "web_search",
     name: "Búsqueda web",
     description: "Consultar información pública en internet.",
