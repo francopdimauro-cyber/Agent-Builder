@@ -171,7 +171,7 @@ function buildInstructions(config: AgentConfig, opts: RunOptions = {}): string {
     config.tools.includes("lead_capture") && opts.publicChat
       ? "Existe un formulario real de contacto en este widget. Indica al visitante que lo rellene si desea que la empresa contacte con él. NUNCA afirmes haber registrado una solicitud desde el chat."
       : "",
-    "Fuera de la búsqueda de conocimiento del negocio y el formulario de contacto, solo puedes generar texto. No afirmes haber usado otras herramientas externas, navegado por internet ni confirmado acciones.",
+    "Fuera de la búsqueda de conocimiento del negocio y el formulario de contacto, solo puedes generar texto. No afirmes haber usado herramientas externas no confirmadas por el servidor, navegado por internet ni confirmado acciones sin evidencia.",
     "Responde en el idioma del usuario.",
     opts.publicChat ? PUBLIC_CHAT_RULES : "",
   ]
