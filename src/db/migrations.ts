@@ -145,4 +145,38 @@ create table audit_logs (
 );
 create index audit_owner_idx on audit_logs(owner_id, created_at desc);
 `,
+  /* 2 — chat público embebible en webs */ `
+create table public_chats (
+  id text primary key,
+  owner_id text not null references users(id) on delete cascade,
+  agent_id text not null references agents(id) on delete cascade,
+  title text not null check (length(title) between 2 and 60),
+  greeting text not null default '',
+  suggestions text not null default '[]' check (json_valid(suggestions)),
+  privacy_notice text not null default '',
+  allowed_origins text not null default '[]' check (json_valid(allowed_origins)),
+  enabled integer not null default 1 check (enabled in (0,1)),
+  per_visitor_limit integer not null default 15,
+  daily_limit integer not null default 500,
+  created_at text not null default (${TS}),
+  updated_at text not null default (${TS})
+);
+create index public_chats_owner_idx on public_chats(owner_id, created_at desc);
+
+-- Mensajes por día (tope global: protege la cuota de IA)
+create table public_chat_usage (
+  chat_id text not null references public_chats(id) on delete cascade,
+  day text not null,
+  messages integer not null default 0,
+  primary key (chat_id, day)
+);
+
+-- Mensajes recientes por visitante (hash de la IP, nunca la IP en claro)
+create table public_chat_hits (
+  chat_id text not null references public_chats(id) on delete cascade,
+  visitor text not null,
+  at integer not null
+);
+create index public_chat_hits_idx on public_chat_hits(chat_id, visitor, at);
+`,
 ];

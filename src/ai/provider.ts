@@ -18,9 +18,17 @@ export class AiProviderError extends Error {
   }
 }
 
+/** Turno previo de una conversación (chat de varios mensajes). */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface GenerateArgs {
   instructions: string;
   input: string;
+  /** Turnos anteriores, del más antiguo al más reciente. `input` es siempre el último mensaje del usuario. */
+  history?: ChatTurn[];
   maxOutputTokens?: number;
   /** Tiempo máximo por intento. El total de la cadena de respaldo se limita a 2× este valor. */
   timeoutMs?: number;
@@ -173,6 +181,7 @@ export function createNvidiaProvider(opts: NvidiaOptions): AiProvider {
       max_tokens: args.maxOutputTokens ?? 1500,
       messages: [
         { role: "system", content: args.instructions },
+        ...(args.history ?? []).map((t) => ({ role: t.role, content: t.content })),
         { role: "user", content: args.input },
       ],
     };

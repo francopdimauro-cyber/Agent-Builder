@@ -6,6 +6,7 @@ import { AppError } from "../errors.ts";
 import { registerAuthRoutes } from "../routes/auth.ts";
 import { registerAgentRoutes } from "../routes/agents.ts";
 import { registerExecutionRoutes } from "../routes/executions.ts";
+import { registerPublicChatRoutes } from "../routes/public-chat.ts";
 import { registerSystemRoutes } from "../routes/system.ts";
 import { registerWorkflowRoutes } from "../routes/workflows.ts";
 import { json, Router, type Req, type Res } from "./router.ts";
@@ -42,6 +43,7 @@ export function createHandler(ctx: Ctx): (request: Request, info?: RequestInfo) 
   registerAgentRoutes(router, ctx);
   registerExecutionRoutes(router, ctx);
   registerWorkflowRoutes(router, ctx);
+  registerPublicChatRoutes(router, ctx);
 
   async function handle(request: Request, info: RequestInfo): Promise<Res> {
     const method = request.method.toUpperCase();
@@ -50,7 +52,8 @@ export function createHandler(ctx: Ctx): (request: Request, info?: RequestInfo) 
     if (!url.pathname.startsWith("/api/")) return json({ error: "No encontrado." }, 404);
 
     // Defensa en profundidad contra CSRF (además de SameSite=Lax): el origen debe ser el propio o estar permitido.
-    if (method !== "GET" && method !== "HEAD") {
+    // El chat público (/api/public/) no usa cookies y valida el origen contra la lista de cada chat.
+    if (method !== "GET" && method !== "HEAD" && !url.pathname.startsWith("/api/public/")) {
       const origin = request.headers.get("origin");
       if (origin) {
         let sameHost = false;

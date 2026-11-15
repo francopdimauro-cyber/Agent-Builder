@@ -60,6 +60,24 @@ export interface WorkflowRunRow {
   created_at: string;
 }
 
+export interface PublicChatRow {
+  id: string;
+  owner_id: string;
+  agent_id: string;
+  title: string;
+  greeting: string;
+  /** JSON: string[] */
+  suggestions: string;
+  privacy_notice: string;
+  /** JSON: string[] de orígenes (https://dominio.es) */
+  allowed_origins: string;
+  enabled: number;
+  per_visitor_limit: number;
+  daily_limit: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ApprovalRow {
   id: string;
   owner_id: string;

@@ -84,6 +84,12 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .evs{list-style:none;margin:0;padding:0;font:12px/1.5 var(--mono)}
 .evs li{display:flex;gap:8px}.evs .t{color:var(--mute)}.evs .k{color:var(--accent)}
 @media (max-width:760px){.exb{grid-template-columns:1fr}}
+.chat{border:1px solid var(--line);border-radius:8px;background:var(--panel);margin-bottom:12px;padding:14px}
+.chat .exh b{font-size:16px}
+.chat dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:10px 0 0;font-size:14px}
+.chat dt{color:var(--mute)}.chat dd{margin:0;word-break:break-word}
+.snippet{position:relative;margin-top:10px}
+.snippet pre{margin:0;white-space:pre-wrap;word-break:break-all;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font:12.5px/1.5 var(--mono)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -102,7 +108,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="app" id="appRoot" hidden>
 <aside>
   <div class="brand">Agent Builder<small>Tus agentes de IA</small></div>
-  <div class="nav"><button id="navA" aria-current="true">Agentes</button><button id="navE" aria-current="false">Ejecuciones</button></div>
+  <div class="nav"><button id="navA" aria-current="true">Agentes</button><button id="navE" aria-current="false">Ejecuciones</button><button id="navC" aria-current="false">Chat web</button></div>
   <div id="agentSide" style="display:contents">
   <div class="btns" style="margin:0 14px 8px"><button class="p" id="new" style="width:100%">Crear agente</button></div>
   <div class="list" id="list" aria-label="Lista de agentes"></div>
@@ -118,7 +124,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <h2>Generar con IA</h2>
     <label for="prompt">¿Qué debe hacer el agente? <span class="hint">(10 a 2000 caracteres)</span></label>
     <textarea id="prompt" maxlength="2000" placeholder="Ej.: Un agente que resuma correos de clientes y proponga una respuesta cordial."></textarea>
-    <div class="btns"><button class="p" id="gen">Generar propuesta</button><span class="status" id="genSt" role="status"></span></div>
+    <div class="btns"><button class="p" id="gen">Generar propuesta</button>
+      <button class="s" id="importBtn" type="button">Importar .json</button><input type="file" id="importFile" accept="application/json,.json" hidden>
+      <span class="status" id="genSt" role="status"></span></div>
   </section>
 
   <section>
@@ -172,300 +180,38 @@ button:disabled{opacity:.5;cursor:not-allowed}
   </div>
   <div id="exList"></div>
 </main>
+
+<main id="viewChat" hidden>
+  <h1>Chat para tu web</h1>
+  <p class="sub">Publica un agente como chat en la web de un cliente. Los visitantes hablan con él sin iniciar sesión; cada mensaje aparece en Ejecuciones.</p>
+
+  <div id="chatList"></div>
+
+  <section>
+    <h2 id="chatFormT">Nuevo chat</h2>
+    <label for="cAgent">Agente <span class="hint">(debe estar activo y sin aprobación obligatoria)</span></label>
+    <select id="cAgent"></select>
+    <label for="cTitle">Nombre visible en el chat</label><input type="text" id="cTitle" maxlength="60" placeholder="Ej.: Refu">
+    <label for="cGreeting">Saludo inicial</label><textarea id="cGreeting" maxlength="500" style="min-height:60px" placeholder="¡Hola! Soy Refu. ¿En qué te ayudo?"></textarea>
+    <label for="cSuggestions">Preguntas sugeridas <span class="hint">(una por línea, máximo 4)</span></label><textarea id="cSuggestions" style="min-height:70px" placeholder="¿A qué hora abrís?"></textarea>
+    <label for="cPrivacy">Aviso de privacidad <span class="hint">(se muestra bajo el saludo)</span></label><input type="text" id="cPrivacy" maxlength="400">
+    <label for="cOrigins">Webs autorizadas <span class="hint">(una por línea, p. ej. https://elrefugiodechilla.es; con y sin www cuentan como distintas)</span></label>
+    <textarea id="cOrigins" style="min-height:70px"></textarea>
+    <div class="row">
+      <div><label for="cPerVisitor">Mensajes por visitante <span class="hint">/10 min</span></label><input type="number" id="cPerVisitor" min="1" max="100" value="15"></div>
+      <div><label for="cDaily">Mensajes al día <span class="hint">(tope del chat)</span></label><input type="number" id="cDaily" min="1" max="20000" value="500"></div>
+      <div><label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:34px"><input type="checkbox" id="cEnabled" checked> Chat activo</label></div>
+    </div>
+    <div class="notice">El tope diario protege tu cuota de IA: un script fuera del navegador podría falsificar la web de origen, pero nunca superará ese tope.</div>
+    <div class="btns">
+      <button class="p" id="cSave">Publicar chat</button>
+      <button class="s" id="cCancel" hidden>Cancelar edición</button>
+      <span class="status" id="cSt" role="status"></span>
+    </div>
+  </section>
+</main>
 </div>
 
-<script>
-const $ = id => document.getElementById(id);
-let TOOLS = [{id:"text_generation",name:"Generación de texto",description:"Razonamiento y redacción mediante el proveedor de IA.",availability:"available"}];
-let agents = [], current = null, currentStatus = null, fromAi = false, registering = false;
-
-async function api(method, path, body){
-  let res;
-  try { res = await fetch(path, {method, credentials:"same-origin", headers: body ? {"Content-Type":"application/json"} : {}, body: body ? JSON.stringify(body) : undefined}); }
-  catch { throw new Error("No se pudo conectar con el servidor."); }
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && !path.startsWith("/api/auth/login")) { showAuth(); throw new Error("Necesitas iniciar sesión."); }
-  if (!res.ok) throw new Error((data.error || "Error " + res.status) + (Array.isArray(data.issues) ? ": " + data.issues.join("; ") : ""));
-  return data;
-}
-function say(id, msg, kind){ const e=$(id); e.textContent=msg||""; e.className="status"+(kind?" "+kind:""); }
-
-/* ---- Acceso ---- */
-function showAuth(){ $("appRoot").hidden = true; $("auth").hidden = false; }
-function setMode(reg){
-  registering = reg;
-  $("authT").textContent = reg ? "Crear cuenta" : "Iniciar sesión";
-  $("authGo").textContent = reg ? "Crear cuenta" : "Entrar";
-  $("authSwap").textContent = reg ? "Ya tengo cuenta" : "Crear cuenta";
-  $("nameRow").hidden = !reg; $("pwHint").textContent = reg ? "(mínimo 10 caracteres)" : "";
-  $("pw").autocomplete = reg ? "new-password" : "current-password"; say("authSt");
-}
-$("authSwap").onclick = () => setMode(!registering);
-$("authGo").onclick = async () => {
-  say("authSt","Un momento…");
-  try{
-    const body = {email:$("email").value.trim(), password:$("pw").value};
-    if (registering) body.displayName = $("dn").value.trim();
-    const d = await api("POST", registering ? "/api/auth/register" : "/api/auth/login", body);
-    $("pw").value = ""; start(d.user);
-  }catch(e){ say("authSt", e.message, "err"); }
-};
-$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("authGo").click(); });
-$("logout").onclick = async () => { clearInterval(execTimer); setView("agents"); try{ await api("POST","/api/auth/logout"); }catch{} showAuth(); };
-
-async function start(user){
-  $("auth").hidden = true; $("appRoot").hidden = false;
-  $("who").textContent = user ? user.display_name : ""; $("logout").hidden = false;
-  try{ const s = await api("GET","/api/system/status"); if (Array.isArray(s.tools)) TOOLS = s.tools; }catch{}
-  fill({}, null); load();
-}
-
-/* ---- Formulario ---- */
-function renderTools(selected){
-  $("tools").innerHTML = TOOLS.map(t => {
-    const ok = t.availability === "available";
-    return `<label class="tool ${ok?"":"off"}" style="font-weight:400;margin:0">
-      <input type="checkbox" value="${t.id}" ${ok?"":"disabled"} ${selected.includes(t.id)?"checked":""}>
-      <span><b></b> ${ok?"":'<span class="tag">no disponible</span>'}<small></small></span></label>`;
-  }).join("");
-  document.querySelectorAll("#tools .tool").forEach((el,i) => {
-    el.querySelector("b").textContent = TOOLS[i].name;
-    el.querySelector("small").textContent = TOOLS[i].availability === "available" ? TOOLS[i].description : (TOOLS[i].unavailableReason || TOOLS[i].description);
-  });
-}
-const LABEL = {draft:"Borrador", active:"Activo", inactive:"Inactivo"};
-function fill(cfg, id, agent, suggested){
-  cfg = cfg || {};
-  $("name").value = cfg.name || ""; $("description").value = cfg.description || "";
-  $("role").value = cfg.role || ""; $("objective").value = cfg.objective || "";
-  $("instructions").value = cfg.instructions || "";
-  $("capabilities").value = (cfg.capabilities || []).join("\n");
-  const l = cfg.limits || {};
-  $("maxOutputTokens").value = l.maxOutputTokens || 1500; $("timeoutSeconds").value = l.timeoutSeconds || 45;
-  $("reasoning").value = l.reasoning || "default"; $("requiresApproval").checked = !!cfg.requiresApproval;
-  renderTools(cfg.tools || []);
-  const sug = (suggested || []).filter(x => x !== "text_generation");
-  $("suggested").hidden = !sug.length;
-  if (sug.length) $("suggested").textContent = "La IA sugirió: " + sug.join(", ") + ". Aún no están disponibles.";
-  current = id || null; currentStatus = agent ? agent.status : null; fromAi = false;
-  $("title").textContent = id ? (cfg.name || "Agente") : "Nuevo agente";
-  $("meta").textContent = agent ? `${LABEL[agent.status] || agent.status} · versión ${agent.current_version}` : "";
-  $("sub").textContent = id ? "Cada cambio que guardes crea una versión nueva." : "Describe qué necesitas y la IA propone una configuración. Tú la revisas antes de guardar.";
-  $("genBox").hidden = !!id; $("del").hidden = !id; $("runBox").hidden = !id;
-  $("toggle").hidden = !id; if (id) $("toggle").textContent = agent.status === "active" ? "Desactivar" : "Activar";
-  $("save").textContent = id ? "Guardar nueva versión" : "Guardar agente";
-  $("out").hidden = true; say("saveSt"); say("genSt"); say("runSt");
-  document.querySelectorAll(".item").forEach(b => b.setAttribute("aria-current", String(b.dataset.id === id)));
-}
-function collect(){
-  return {
-    name: $("name").value.trim(), description: $("description").value.trim(),
-    role: $("role").value.trim(), objective: $("objective").value.trim(), instructions: $("instructions").value.trim(),
-    capabilities: $("capabilities").value.split("\n").map(s=>s.trim()).filter(Boolean),
-    tools: [...document.querySelectorAll("#tools input:checked")].map(i=>i.value),
-    limits: { maxOutputTokens:+$("maxOutputTokens").value, timeoutSeconds:+$("timeoutSeconds").value, reasoning:$("reasoning").value },
-    requiresApproval: $("requiresApproval").checked
-  };
-}
-
-/* ---- Lista y detalle ---- */
-async function load(selectId){
-  try{
-    agents = (await api("GET","/api/agents")).agents || [];
-    $("list").innerHTML = agents.length ? agents.map(a => '<button class="item"><b></b><span></span></button>').join("") : '<div class="empty">Aún no tienes agentes. Crea el primero.</div>';
-    document.querySelectorAll(".item").forEach((b,i) => {
-      const a = agents[i]; b.dataset.id = a.id;
-      b.querySelector("b").textContent = a.name;
-      b.querySelector("span").textContent = (LABEL[a.status] || a.status) + (a.description ? " · " + a.description : "");
-      b.onclick = () => open(a.id);
-      b.setAttribute("aria-current", String(a.id === selectId));
-    });
-  }catch(e){ $("list").innerHTML = '<div class="empty"></div>'; $("list").firstChild.textContent = e.message; }
-}
-async function open(id){
-  try{
-    const d = await api("GET","/api/agents/" + id);
-    const v = d.versions.find(x => x.version === d.agent.current_version) || d.versions[0];
-    fill(v.config, id, d.agent);
-  }catch(e){ say("saveSt", e.message, "err"); }
-}
-$("new").onclick = () => fill({}, null);
-
-$("gen").onclick = async () => {
-  const p = $("prompt").value.trim();
-  if (p.length < 10) return say("genSt","Escribe al menos 10 caracteres.","err");
-  $("gen").disabled = true; say("genSt","Generando… puede tardar unos segundos.");
-  try{
-    const d = await api("POST","/api/agents/generate",{prompt:p});
-    fill(d.config, null, null, d.suggestedTools); fromAi = true; $("genBox").hidden = false;
-    say("genSt","Propuesta lista. Activa «Generación de texto» y guarda cuando estés conforme.","ok");
-  }catch(e){ say("genSt", e.message, "err"); }
-  $("gen").disabled = false;
-};
-
-$("save").onclick = async () => {
-  $("save").disabled = true; say("saveSt","Guardando…");
-  try{
-    const cfg = collect();
-    if (current){ await api("POST","/api/agents/"+current+"/versions",{config:cfg}); await load(current); await open(current); say("saveSt","Versión guardada.","ok"); }
-    else { const d = await api("POST","/api/agents",{config:cfg, source: fromAi ? "ai" : "manual"}); await load(d.id); await open(d.id); say("saveSt","Agente guardado. Actívalo para poder ejecutarlo.","ok"); }
-  }catch(e){ say("saveSt", e.message, "err"); }
-  $("save").disabled = false;
-};
-$("toggle").onclick = async () => {
-  try{
-    await api("POST","/api/agents/"+current+"/status",{status: currentStatus === "active" ? "inactive" : "active"});
-    await load(current); await open(current); say("saveSt","Estado actualizado.","ok");
-  }catch(e){ say("saveSt", e.message, "err"); }
-};
-$("del").onclick = async () => {
-  if (!current || !confirm("¿Eliminar este agente? Esta acción no se puede deshacer.")) return;
-  try{ await api("DELETE","/api/agents/"+current); await load(); fill({}, null); }catch(e){ say("saveSt", e.message, "err"); }
-};
-
-$("run").onclick = async () => {
-  const input = $("input").value.trim();
-  if (!input) return say("runSt","Escribe un mensaje de entrada.","err");
-  $("run").disabled = true; say("runSt","Ejecutando…"); $("out").hidden = true;
-  try{
-    const r = await api("POST","/api/executions",{agentId:current, input});
-    const d = await api("GET","/api/executions/"+r.id);
-    const ex = d.execution;
-    if (ex.status === "awaiting_approval"){ say("runSt","Esperando aprobación: este agente requiere que apruebes antes de ejecutar.","ok"); }
-    else {
-      $("out").textContent = ex.status === "completed" ? ex.output : (ex.error || "La ejecución terminó con estado " + ex.status + ".");
-      $("out").hidden = false;
-      say("runSt", ex.status === "completed" ? "Completada" + (ex.model ? " con " + ex.model : "") + "." : "Falló.", ex.status === "completed" ? "ok" : "err");
-    }
-  }catch(e){ say("runSt", e.message, "err"); }
-  $("run").disabled = false;
-};
-
-/* ---- Centro de ejecución ---- */
-const ST = {draft:"Borrador",queued:"En cola",running:"Ejecutando",awaiting_approval:"Esperando aprobación",completed:"Completada",failed:"Fallida",cancelled:"Cancelada"};
-const TERMINAL = ["completed","failed","cancelled"];
-const openIds = new Set(); let view = "agents", execTimer = null;
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-const fmt = s => s ? new Date(s).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"medium"}) : "";
-
-for (const k of Object.keys(ST)) { const o = document.createElement("option"); o.value = k; o.textContent = ST[k]; $("fStatus").appendChild(o); }
-
-function setView(v){
-  view = v;
-  $("viewAgents").hidden = v !== "agents"; $("viewExec").hidden = v !== "exec";
-  $("agentSide").style.display = v === "agents" ? "contents" : "none";
-  $("navA").setAttribute("aria-current", String(v === "agents")); $("navE").setAttribute("aria-current", String(v === "exec"));
-  clearInterval(execTimer);
-  if (v === "exec"){
-    const cur = $("fAgent").value;
-    $("fAgent").innerHTML = '<option value="">Todos los agentes</option>';
-    agents.forEach(a => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.name; $("fAgent").appendChild(o); });
-    $("fAgent").value = cur;
-    loadExec(); execTimer = setInterval(() => { if (!document.hidden) loadExec(true); }, 4000);
-  }
-}
-$("navA").onclick = () => setView("agents"); $("navE").onclick = () => setView("exec");
-$("fStatus").onchange = () => loadExec(); $("fAgent").onchange = () => loadExec(); $("exRefresh").onclick = () => loadExec();
-
-async function loadExec(quiet){
-  if (!quiet) say("exSt","Cargando…");
-  try{
-    const p = new URLSearchParams({limit:"100"});
-    if ($("fStatus").value) p.set("status", $("fStatus").value);
-    if ($("fAgent").value) p.set("agentId", $("fAgent").value);
-    const [ex, ap] = await Promise.all([api("GET","/api/executions?"+p), api("GET","/api/approvals?status=pending")]);
-    const pending = {}; (ap.approvals || []).forEach(a => { if (a.execution_id) pending[a.execution_id] = a.id; });
-    const list = ex.executions || [];
-    const box = $("exList"); box.textContent = "";
-    if (!list.length) box.appendChild(mk("p","empty","Aún no hay ejecuciones. Lanza un agente desde la pestaña Agentes y aparecerá aquí."));
-    for (const e of list) box.appendChild(await row(e, pending[e.id]));
-    say("exSt", list.length + (list.length === 1 ? " ejecución" : " ejecuciones"));
-  }catch(e){ say("exSt", e.message, "err"); }
-}
-
-async function row(e, approvalId){
-  const name = (agents.find(a => a.id === e.agent_id) || {}).name || "Agente eliminado";
-  const wrap = mk("div","ex"), head = mk("div","exh");
-  const isOpen = openIds.has(e.id);
-  const tg = mk("button","tg", isOpen ? "▾" : "▸"); tg.setAttribute("aria-label", isOpen ? "Ocultar detalle" : "Ver detalle"); tg.setAttribute("aria-expanded", String(isOpen));
-  tg.onclick = () => { isOpen ? openIds.delete(e.id) : openIds.add(e.id); loadExec(true); };
-  head.append(tg, mk("span","badge b-"+e.status, ST[e.status] || e.status), mk("b","",name),
-    mk("span","hint","v"+e.agent_version+" · intento "+e.attempt+(e.workflow_run_id ? " · flujo" : "")), mk("span","when",fmt(e.created_at)));
-  const act = (label, cls, fn, okMsg) => { const b = mk("button","mini "+cls,label); b.onclick = async () => { b.disabled = true; try{ await fn(); say("exSt",okMsg,"ok"); }catch(er){ say("exSt",er.message,"err"); } loadExec(true); }; head.appendChild(b); };
-  if (e.status === "awaiting_approval" && approvalId){
-    act("Aprobar","ok",() => api("POST","/api/approvals/"+approvalId+"/decision",{approve:true}),"Aprobada y ejecutada.");
-    act("Rechazar","no",() => api("POST","/api/approvals/"+approvalId+"/decision",{approve:false}),"Rechazada.");
-  }
-  if (!TERMINAL.includes(e.status)) act("Cancelar","no",() => api("POST","/api/executions/"+e.id+"/cancel"),"Cancelada.");
-  if ((e.status === "failed" || e.status === "cancelled") && !e.workflow_run_id) act("Reintentar","ok",() => api("POST","/api/executions/"+e.id+"/retry"),"Reintento lanzado.");
-  wrap.appendChild(head);
-  if (isOpen){
-    let events = []; try{ events = (await api("GET","/api/executions/"+e.id)).events || []; }catch{}
-    const body = mk("div","exb"), l = mk("div"), r = mk("div");
-    l.append(mk("h3","","Entrada"), mk("pre","",e.input));
-    l.append(mk("h3","","Salida"+(e.model ? " · "+e.model : "")));
-    if (e.error) l.appendChild(mk("pre","e",e.error));
-    if (e.output) l.appendChild(mk("pre","",e.output)); else if (!e.error) l.appendChild(mk("p","hint","Sin salida todavía."));
-    r.appendChild(mk("h3","","Eventos"));
-    const ol = mk("ol","evs");
-    events.forEach(ev => { const li = mk("li"); li.append(mk("span","t",new Date(ev.created_at).toLocaleTimeString("es-ES")), mk("span","k",ev.type), mk("span","",ev.message)); ol.appendChild(li); });
-    r.appendChild(ol); body.append(l, r); wrap.appendChild(body);
-  }
-  return wrap;
-}
-
-(async () => {
-  try{ const d = await api("GET","/api/auth/me"); start(d.user); }
-  catch{ showAuth(); }
-})();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
-
-
-$("save").onclick = async () => {
-  $("save").disabled = true; say("saveSt","Guardando…");
-  try{
-    const cfg = collect();
-    if (current){ await api("POST","/api/agents/"+current+"/versions",{config:cfg}); await load(current); await open(current); say("saveSt","Versión guardada.","ok"); }
-    else { const d = await api("POST","/api/agents",{config:cfg, source: fromAi ? "ai" : "manual"}); await load(d.id); await open(d.id); say("saveSt","Agente guardado. Actívalo para poder ejecutarlo.","ok"); }
-  }catch(e){ say("saveSt", e.message, "err"); }
-  $("save").disabled = false;
-};
-$("toggle").onclick = async () => {
-  try{
-    await api("POST","/api/agents/"+current+"/status",{status: currentStatus === "active" ? "inactive" : "active"});
-    await load(current); await open(current); say("saveSt","Estado actualizado.","ok");
-  }catch(e){ say("saveSt", e.message, "err"); }
-};
-$("del").onclick = async () => {
-  if (!current || !confirm("¿Eliminar este agente? Esta acción no se puede deshacer.")) return;
-  try{ await api("DELETE","/api/agents/"+current); await load(); fill({}, null); }catch(e){ say("saveSt", e.message, "err"); }
-};
-
-$("run").onclick = async () => {
-  const input = $("input").value.trim();
-  if (!input) return say("runSt","Escribe un mensaje de entrada.","err");
-  $("run").disabled = true; say("runSt","Ejecutando…"); $("out").hidden = true;
-  try{
-    const r = await api("POST","/api/executions",{agentId:current, input});
-    const d = await api("GET","/api/executions/"+r.id);
-    const ex = d.execution;
-    if (ex.status === "awaiting_approval"){ say("runSt","Esperando aprobación: este agente requiere que apruebes antes de ejecutar.","ok"); }
-    else {
-      $("out").textContent = ex.status === "completed" ? ex.output : (ex.error || "La ejecución terminó con estado " + ex.status + ".");
-      $("out").hidden = false;
-      say("runSt", ex.status === "completed" ? "Completada" + (ex.model ? " con " + ex.model : "") + "." : "Falló.", ex.status === "completed" ? "ok" : "err");
-    }
-  }catch(e){ say("runSt", e.message, "err"); }
-  $("run").disabled = false;
-};
-
-(async () => {
-  try{ const d = await api("GET","/api/auth/me"); start(d.user); }
-  catch{ showAuth(); }
-})();
-</script>
-</body>
-</html>
-
