@@ -148,6 +148,19 @@ button,textarea{font:inherit;color:inherit}
 .chip{border:1px solid var(--border-strong); background:var(--bg); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; color:var(--fg); transition:background-color .15s,border-color .15s}
 .chip:hover{background:var(--surface); border-color:var(--accent)}
 
+.contact-toggle{margin:0 16px 9px;display:block;width:calc(100% - 32px);min-height:35px;border:1px solid var(--border-strong);border-radius:9px;background:var(--surface);color:var(--fg);font-size:12px;font-weight:600;cursor:pointer}
+.contact-toggle:hover{border-color:var(--accent)}
+.contact-toggle[hidden]{display:none}
+.contact-form{margin:0 16px 12px;padding:12px;display:grid;gap:9px;border:1px solid var(--border-strong);background:var(--surface);border-radius:12px}
+.contact-form[hidden]{display:none}
+.contact-form label{display:grid;gap:4px;font-size:11px;color:var(--muted)}
+.contact-form input,.contact-form textarea{width:100%;min-height:36px;padding:8px 9px;border:1px solid var(--border-strong);border-radius:7px;background:var(--bg);color:var(--fg);font-size:12px;line-height:1.4}
+.contact-form textarea{min-height:68px;resize:vertical;max-height:130px}
+.contact-form .consent{display:flex;align-items:flex-start;gap:7px;font-size:11px;line-height:1.4}
+.contact-form .consent input{width:14px;min-height:14px;flex:none;margin-top:1px}
+.contact-form button{padding:9px 11px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-fg);font-size:12px;font-weight:700;cursor:pointer}
+.contact-form button:disabled{opacity:.4;cursor:not-allowed}
+.contact-feedback{font-size:11px;line-height:1.4;color:var(--muted)}
 .composer{display:flex; align-items:flex-end; gap:8px; margin:0 12px 12px; padding:6px 6px 6px 14px; border:1px solid var(--border-strong); border-radius:14px; background:var(--surface); transition:border-color .15s,box-shadow .15s}
 .composer:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
 textarea{flex:1; border:0; outline:0; background:none; resize:none; max-height:120px; min-height:36px; padding:7px 0; font-size:14.5px; line-height:1.45; overflow-y:hidden; scrollbar-width:thin}
@@ -212,8 +225,24 @@ textarea::placeholder{color:var(--subtle)}
   const composer = el("form", { class: "composer" }, input, sendBtn);
   const counter = el("span", { "aria-hidden": "true" });
   const foot = el("div", { class: "foot" }, el("span", { text: "Asistente con IA · puede equivocarse" }), counter);
+  const contactToggle=el("button",{class:"contact-toggle",type:"button",text:"Solicitar que me contacten",hidden:""});
+  const contactName=el("input",{type:"text",required:"",maxlength:"100",autocomplete:"name",placeholder:"Tu nombre","aria-label":"Nombre de contacto"});
+  const contactEmail=el("input",{type:"email",required:"",maxlength:"254",autocomplete:"email",placeholder:"tucorreo@ejemplo.es","aria-label":"Correo de contacto"});
+  const contactMessage=el("textarea",{required:"",maxlength:"1500",placeholder:"¿En qué podemos ayudarte?","aria-label":"Mensaje de contacto",rows:"3"});
+  const contactConsent=el("input",{type:"checkbox",required:"","aria-label":"Consiento el envío de mis datos para que esta empresa contacte conmigo"});
+  const contactHoneypot=el("input",{type:"text",name:"website",tabindex:"-1",autocomplete:"off","aria-hidden":"true"});
+  contactHoneypot.style.cssText="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px";
+  const contactSend=el("button",{type:"submit",text:"Enviar solicitud"});
+  const contactFeedback=el("div",{class:"contact-feedback",role:"status","aria-live":"polite"});
+  const contactForm=el("form",{class:"contact-form",hidden:""},
+    el("label",{},el("span",{text:"Nombre"}),contactName),
+    el("label",{},el("span",{text:"Correo electrónico"}),contactEmail),
+    el("label",{},el("span",{text:"Mensaje"}),contactMessage),
+    el("label",{class:"consent"},contactConsent,el("span",{text:"Autorizo enviar mis datos a esta empresa para recibir una respuesta. No se enviarán a terceros por este formulario."})),
+    contactHoneypot,contactSend,contactFeedback
+  );
   const status = el("p", { class: "sr", role: "status" });
-  const panel = el("div", { class: "panel", id: panelId, role: "dialog", "aria-modal": "false", hidden: "" }, head, log, chips, composer, foot, status);
+  const panel = el("div", { class: "panel", id: panelId, role: "dialog", "aria-modal": "false", hidden: "" }, head, log, chips, composer, contactToggle, contactForm, foot, status);
 
   /* ---------------- Render ---------------- */
 
@@ -359,6 +388,33 @@ textarea::placeholder{color:var(--subtle)}
   });
   panel.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } });
   composer.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
+  contactToggle.addEventListener("click",()=>{
+    contactForm.hidden=!contactForm.hidden;
+    if(!contactForm.hidden)contactName.focus();
+  });
+  contactForm.addEventListener("submit",async(event)=>{
+    event.preventDefault();
+    if(contactSend.disabled||!contactConsent.checked)return;
+    contactSend.disabled=true;
+    contactFeedback.textContent="Registrando tu solicitud…";
+    try{
+      const response=await fetch(ENDPOINT+"/leads",{
+        method:"POST",credentials:"omit",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          name:contactName.value.trim(),email:contactEmail.value.trim(),
+          message:contactMessage.value.trim(),consent:true,website:contactHoneypot.value
+        })
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.ok)throw Error(data.error||"No se pudo registrar la solicitud.");
+      contactFeedback.textContent="Solicitud registrada. La empresa podrá consultarla desde su panel.";
+      contactName.value="";contactEmail.value="";contactMessage.value="";contactConsent.checked=false;
+      contactForm.hidden=true;
+      log.append(el("p",{class:"notice",text:"Tu solicitud de contacto se ha guardado correctamente."}));
+    }catch(e){contactFeedback.textContent=e.message||"No se pudo enviar. Inténtalo de nuevo.";contactSend.disabled=false;}
+    finally{contactSend.disabled=false;}
+  });
+
   input.addEventListener("input", autosize);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
@@ -389,6 +445,7 @@ textarea::placeholder{color:var(--subtle)}
         greeting: String(data.greeting || ""),
         suggestions: Array.isArray(data.suggestions) ? data.suggestions.map(String).slice(0, 4) : [],
         privacyNotice: String(data.privacyNotice || ""),
+        contactEnabled: data.contactEnabled === true,
       };
     } catch (e) {
       console.warn("[chat] No se pudo cargar el chat:", e.message);
@@ -396,6 +453,7 @@ textarea::placeholder{color:var(--subtle)}
     }
 
     applyTheme();
+    contactToggle.hidden=!config.contactEnabled;
     titleEl.textContent = config.title;
     avatar.textContent = config.title.trim().charAt(0).toUpperCase() || "?";
     launcherText.textContent = (ds.label || `Pregunta a ${config.title}`).slice(0, 40);
