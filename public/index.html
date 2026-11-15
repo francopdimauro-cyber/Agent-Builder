@@ -167,9 +167,20 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <p class="hint">Debe ser la dirección exacta de su web, sin rutas. Si todavía no tiene dominio, puedes usar la URL provisional de Workers.</p>
     <div class="btns">
       <button class="p" type="button" id="exportZip">Descargar ZIP independiente</button>
+      <button class="s" type="button" id="deployCf">Desplegar en Cloudflare</button>
       <span class="status" id="exportStatus" role="status"></span>
     </div>
     <p class="notice">El ZIP no incluye contraseñas ni claves de IA. Cada cliente configura la suya en Cloudflare. Solo funciona con agentes activos que utilicen Generación de texto y no exijan aprobación humana.</p>
+    <div id="deployInfo" hidden style="margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:12px">
+      <strong id="deployName"></strong>
+      <p class="hint">Worker independiente creado. La IA permanecerá desactivada hasta configurar su propia clave privada de NVIDIA en Cloudflare.</p>
+      <p><a id="deployWorkerUrl" target="_blank" rel="noopener noreferrer"></a></p>
+      <label for="deployEmbed">Código para pegar en la web del cliente</label>
+      <textarea id="deployEmbed" readonly rows="4" style="font-family:var(--mono);font-size:12px"></textarea>
+      <button class="s" type="button" id="deployCopy">Copiar código del widget</button>
+    </div>
+    <div class="status" id="deployStatus" role="status" aria-live="polite"></div>
+
   </section>
 
   <section id="runBox" hidden>
