@@ -83,7 +83,7 @@ test("contacto: opt-in, origen permitido, controles antispam y acceso exclusivo 
  assert.equal(before.json.leads.length,0);
  const accepted=await publicRequest(route,payload);
  assert.equal(accepted.status,201,JSON.stringify(accepted.json));
- assert.equal(accepted.json.ok,true);
+ assert.equal(accepted.json?.ok,true);
  const leads=await ana.get("/api/leads");
  assert.equal(leads.json.leads.length,1);
  assert.equal(leads.json.leads[0].email,"alba@example.test");
