@@ -132,3 +132,9 @@ sus ejecuciones vivas, control de CSRF por origen, y límite de tamaño de cuerp
 1. **Fase 2 — interfaz web**: hechos agentes, ejecución y chat web; faltan flujos, supervisor y ajustes.
 2. **Fase 3 — herramientas reales**: búsqueda (SearXNG autoalojado) y HTTP con lista blanca de dominios.
 3. Docker Compose y copia de seguridad de la base de datos.
+
+## Exportar cada agente como proyecto independiente
+
+En el panel, activa el agente y abre **Entregar este agente como ZIP independiente**. Escribe el origen HTTPS exacto de la web del cliente y pulsa **Descargar ZIP independiente**. El navegador crea un ZIP con `src/worker.mjs`, `src/agent.json`, `public/widget.js`, `wrangler.toml`, `package.json`, `README.md` y `EMBEBER_EN_WEB.txt`.
+
+Cada ZIP contiene su **propio Worker** y **Durable Object SQLite** con controles de cuota, sin dependencia del servidor central. El cliente necesita configurar una clave de NVIDIA propia con `wrangler secret put NVIDIA_API_KEY`; nunca se copian las claves del constructor. El backend independiente solo implementa chat de texto, sin herramientas externas, flujos ni aprobación humana. Para cambiar sus instrucciones, se modifica `src/agent.json` y se despliega nuevamente. Exportar no elimina ni migra el agente del constructor original.
