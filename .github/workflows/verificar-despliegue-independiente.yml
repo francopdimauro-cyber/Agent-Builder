@@ -1,0 +1,33 @@
+name: Verificar despliegue directo de agentes a Cloudflare
+on:
+  push:
+    branches:
+      - feature/desplegar-agentes-cloudflare-20261115
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Instalar dependencias
+        run: npm install
+      - name: Comprobar tipos
+        run: npm run typecheck
+      - name: Ejecutar pruebas
+        run: npm test
+      - name: Comprobar exportador ZIP anterior
+        run: node --test test/export-standalone.test.mjs
+      - name: Compilar Worker con bindings de ASSETS
+        run: |
+          node_modules/.bin/wrangler deploy --dry-run
+      - name: Verificar que el token nunca queda en codigo público
+        run: |
+          test -f src/deploy/cloudflare.ts
+          grep -q 'CF_DEPLOY_API_TOKEN' src/worker.ts
+          ! grep -q 'CF_DEPLOY_API_TOKEN' public/app.js
+          ! grep -q 'CF_DEPLOY_API_TOKEN' public/index.html
