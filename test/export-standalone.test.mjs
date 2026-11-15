@@ -30,7 +30,7 @@ test("genera ZIP completo y autónomo, sin credenciales, con CORS específico", 
   assert.ok(data.zip.length > widgetSource.length);
   assert.deepEqual([...data.zip.slice(0,4)], [0x50,0x4b,0x03,0x04]);
   assert.deepEqual(Object.keys(data.files).sort(), [
-    ".gitignore","EMBEBER_EN_WEB.html","README.md","package.json",
+    ".gitignore","EMBEBER_EN_WEB.txt","README.md","package.json",
     "public/widget.js","src/agent.json","src/worker.mjs","wrangler.toml"
   ].sort());
   const manifest = JSON.parse(data.files["src/agent.json"]);
@@ -39,7 +39,7 @@ test("genera ZIP completo y autónomo, sin credenciales, con CORS específico", 
   assert.equal(manifest.instructions, config.instructions);
   assert.ok(data.files["wrangler.toml"].includes('new_sqlite_classes = ["SiteAgent"]'));
   assert.ok(data.files["src/worker.mjs"].includes("this.ctx.storage.transactionSync"));
-  assert.ok(data.files["EMBEBER_EN_WEB.html"].includes(uniqueId));
+  assert.ok(data.files["EMBEBER_EN_WEB.txt"].includes(uniqueId));
   assert.ok(!data.files["src/agent.json"].includes("NVIDIA_API_KEY"));
   assert.ok(!data.files["wrangler.toml"].includes("nvidia-api-key-placeholder"));
   assert.ok(!data.files["src/worker.mjs"].includes("agent-factory-free.francopdimauro.workers.dev"));
