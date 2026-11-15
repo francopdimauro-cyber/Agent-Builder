@@ -1,0 +1,22 @@
+name: Verificar Agent Builder (rama temporal)
+on:
+  push:
+    branches:
+      - agent-builder-parche-verificacion-20261115
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Instalar dependencias
+        run: npm install
+      - name: Probar (46/46)
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
