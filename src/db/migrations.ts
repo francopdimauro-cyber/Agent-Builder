@@ -179,4 +179,37 @@ create table public_chat_hits (
 );
 create index public_chat_hits_idx on public_chat_hits(chat_id, visitor, at);
 `,
+  /* 3 — herramientas reales con datos aislados por propietario y agente */ `
+create table agent_knowledge (
+  id text primary key,
+  owner_id text not null references users(id) on delete cascade,
+  agent_id text not null references agents(id) on delete cascade,
+  question text not null check(length(question) between 3 and 250),
+  answer text not null check(length(answer) between 3 and 1500),
+  updated_at text not null default (${TS})
+);
+create index knowledge_agent_lookup on agent_knowledge(owner_id,agent_id);
+
+create table contact_leads (
+  id text primary key,
+  owner_id text not null references users(id) on delete cascade,
+  agent_id text not null references agents(id) on delete cascade,
+  chat_id text not null references public_chats(id) on delete cascade,
+  name text not null check(length(name) between 2 and 100),
+  email text not null check(length(email) between 5 and 254),
+  message text not null check(length(message) between 5 and 1500),
+  consent_at text not null,
+  created_at text not null default (${TS})
+);
+create index leads_owner_recent on contact_leads(owner_id,created_at desc);
+create index leads_chat_recent on contact_leads(chat_id,created_at desc);
+
+create table contact_lead_hits(
+  chat_id text not null references public_chats(id) on delete cascade,
+  visitor text not null,
+  at integer not null
+);
+create index lead_hits_visitor on contact_lead_hits(chat_id,visitor,at);
+`,
+
 ];
