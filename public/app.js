@@ -76,6 +76,10 @@ function fill(cfg, id, agent, suggested){
   $("meta").textContent = agent ? `${LABEL[agent.status] || agent.status} · versión ${agent.current_version}` : "";
   $("sub").textContent = id ? "Cada cambio que guardes crea una versión nueva." : "Describe qué necesitas y la IA propone una configuración. Tú la revisas antes de guardar.";
   $("genBox").hidden = !!id; $("del").hidden = !id; $("runBox").hidden = !id;
+  $("exportBox").hidden = !id;
+  $("exportZip").disabled = !id || agent?.status !== "active";
+  $("exportDomain").value = "";
+  say("exportStatus");
   $("toggle").hidden = !id; if (id) $("toggle").textContent = agent.status === "active" ? "Desactivar" : "Activar";
   $("save").textContent = id ? "Guardar nueva versión" : "Guardar agente";
   $("out").hidden = true; say("saveSt"); say("genSt"); say("runSt");
@@ -91,6 +95,29 @@ function collect(){
     requiresApproval: $("requiresApproval").checked
   };
 }
+
+/* ---- Entrega independiente por cliente ---- */
+$("exportZip").onclick = async () => {
+  if (!current) return;
+  $("exportZip").disabled = true;
+  say("exportStatus", "Preparando paquete independiente...");
+  try {
+    const d = await api("GET", "/api/agents/" + encodeURIComponent(current));
+    const version = d.versions.find(x => x.version === d.agent.current_version) || d.versions[0];
+    if (!version) throw Error("No se ha encontrado la configuración del agente.");
+    const { downloadStandaloneZip } = await import("./export/exporter.mjs");
+    const result = await downloadStandaloneZip({
+      agent: d.agent,
+      config: version.config,
+      siteOrigin: $("exportDomain").value.trim()
+    });
+    say("exportStatus", "ZIP generado: " + result.workerName + ".zip. Descomprímelo y sigue su README.md.", "ok");
+  } catch (e) {
+    say("exportStatus", e.message || "No se pudo generar el ZIP.", "err");
+  } finally {
+    $("exportZip").disabled = currentStatus !== "active";
+  }
+};
 
 /* ---- Lista y detalle ---- */
 async function load(selectId){
