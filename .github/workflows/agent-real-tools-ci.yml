@@ -1,0 +1,30 @@
+name: Agent Builder · Herramientas reales y aislamiento
+on:
+  push:
+    branches:
+      - feature/real-tools-knowledge-leads-20261115
+    paths:
+      - 'src/**'
+      - 'public/widget.js'
+      - 'test/**'
+      - '.github/workflows/agent-real-tools-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Pruebas automatizadas de motor, API y seguridad
+        run: npm test
+      - name: Validación TypeScript
+        run: npm run typecheck
+      - name: Compilar Worker de prueba sin desplegar
+        run: npx wrangler deploy --dry-run --outdir /tmp/wayup-agent-tools
