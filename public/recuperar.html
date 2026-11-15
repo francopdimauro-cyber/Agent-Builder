@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Restablecer acceso · Agent Builder</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#101a17;color:#eef7f1}
+    *,*:before,*:after{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}
+    main{width:100%;max-width:445px;background:#18241f;border:1px solid #34483e;border-radius:16px;padding:32px;box-shadow:0 16px 55px #0003}
+    h1{font-size:26px;letter-spacing:-.03em;margin:0 0 12px}p{line-height:1.55;color:#b5c8bc}
+    label{display:block;font-weight:600;margin:19px 0 7px}
+    input{display:block;width:100%;font:inherit;color:inherit;background:#111d18;padding:13px;border:1px solid #527363;border-radius:8px}
+    input:focus{outline:2px solid #7ed4a8;outline-offset:2px}
+    button{width:100%;background:#7ed4a8;color:#082013;border:0;border-radius:8px;font:inherit;font-weight:700;padding:15px;cursor:pointer;margin-top:24px}
+    button:disabled{opacity:.55;cursor:wait}
+    small{color:#b5c8bc}.error{color:#ffafae}.success{color:#9af2be}
+    a{color:#9fe5c0}.hint{font-size:13px}.status{min-height:40px;font-size:14px}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Restablecer acceso</h1>
+  <p>Elige las nuevas credenciales para administrar Refu en Agent Builder. Solo se modificará la cuenta de acceso; el agente y sus chats permanecerán intactos.</p>
+  <form id="recoveryForm">
+    <label for="email">Nuevo correo de acceso <small>(opcional)</small></label>
+    <input id="email" type="email" autocomplete="email" maxlength="254" placeholder="Déjalo vacío para conservar el actual">
+    <label for="password">Nueva contraseña</label>
+    <input id="password" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
+    <p class="hint">Mínimo 12 caracteres. Usa una contraseña única y guárdala en tu gestor de contraseñas.</p>
+    <label for="confirm">Repetir contraseña</label>
+    <input id="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
+    <button id="submit" type="submit">Guardar y cerrar sesiones anteriores</button>
+  </form>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+  <p><a href="/">Volver a Agent Builder</a></p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const form = document.getElementById('recoveryForm');
+  const status = document.getElementById('status');
+  const button = document.getElementById('submit');
+  let token = location.hash.slice(1);
+  history.replaceState(null, '', location.pathname);
+  if (!/^[A-Za-z0-9_-]{40,96}$/.test(token)) {
+    form.hidden = true;
+    status.className = 'status error';
+    status.textContent = 'Este enlace de recuperación no contiene un código válido. Solicita uno nuevo al administrador.';
+    return;
+  }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+    const email = document.getElementById('email').value.trim();
+    status.textContent = '';
+    status.className = 'status error';
+    if (password.length < 12 || password !== confirm) {
+      status.textContent = 'Comprueba que las contraseñas coinciden y tienen al menos 12 caracteres.';
+      return;
+    }
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/auth/recover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ token, password, email })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'No se ha podido restablecer el acceso.');
+      token = '';
+      form.hidden = true;
+      status.className = 'status success';
+      status.textContent = 'Acceso restablecido. Las sesiones anteriores están cerradas. Ya puedes iniciar sesión con las nuevas credenciales.';
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Error al recuperar el acceso.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
