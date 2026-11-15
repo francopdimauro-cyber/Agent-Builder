@@ -138,3 +138,27 @@ sus ejecuciones vivas, control de CSRF por origen, y límite de tamaño de cuerp
 En el panel, activa el agente y abre **Entregar este agente como ZIP independiente**. Escribe el origen HTTPS exacto de la web del cliente y pulsa **Descargar ZIP independiente**. El navegador crea un ZIP con `src/worker.mjs`, `src/agent.json`, `public/widget.js`, `wrangler.toml`, `package.json`, `README.md` y `EMBEBER_EN_WEB.txt`.
 
 Cada ZIP contiene su **propio Worker** y **Durable Object SQLite** con controles de cuota, sin dependencia del servidor central. El cliente necesita configurar una clave de NVIDIA propia con `wrangler secret put NVIDIA_API_KEY`; nunca se copian las claves del constructor. El backend independiente solo implementa chat de texto, sin herramientas externas, flujos ni aprobación humana. Para cambiar sus instrucciones, se modifica `src/agent.json` y se despliega nuevamente. Exportar no elimina ni migra el agente del constructor original.
+
+## Desplegar un agente en Cloudflare desde el panel (sin instalar el ZIP)
+
+**Disponible para el administrador de esta instancia.** Este flujo crea **un Worker por pareja agente + origen HTTPS**, junto con un **Durable Object SQLite exclusivo**, sin que el Worker resultante dependa de Agent Builder. No crea un repositorio GitHub nuevo; para distribuir el código fuente utiliza «Descargar ZIP independiente».
+
+### Configurar la conexión una única vez
+
+1. En Cloudflare, abre **Mi perfil > API Tokens > Create Token**. Crea un token de **cuenta** con permisos de **Workers Scripts: Edit** y **Workers Scripts: Read**, limitado a **esta cuenta**. Valora también una política de caducidad y restricción por IP si procede. No utilices la clave global.
+2. Abre el Worker **agent-factory-free > Settings > Variables and Secrets**. Añade un **secreto** llamado `CF_DEPLOY_API_TOKEN` y pega allí el token. Nunca lo introduzcas en el código, el ZIP, GitHub ni el navegador de Agent Builder.
+3. En `wrangler.toml`, la variable no secreta `CF_DEPLOY_ACCOUNT_ID` debe corresponder a la cuenta donde crearás los Workers. El proyecto incluye el identificador de la cuenta que actualmente aloja Agent Builder. Si cambias de cuenta, actualízalo con cuidado.
+4. Confirma que `agent-factory-free` continúa funcionando. Guardar un secreto de Worker puede provocar un nuevo despliegue.
+
+### Crear el Worker de un cliente
+
+1. Abre **Agentes** y selecciona un agente **activo** que use solamente **Generación de texto**.
+2. En **Entregar este agente como ZIP independiente**, introduce el origen HTTPS exacto de la web del cliente, por ejemplo `https://www.tunegocio.es` sin rutas. Los orígenes con y sin `www` son diferentes.
+3. Pulsa **Desplegar en Cloudflare** y confirma la operación. El Worker realiza una llamada autenticada a la API, crea el Worker independiente y activa su URL `workers.dev`.
+4. El panel muestra el nombre, la URL y el código `<script>` que debes instalar en la web del cliente.
+5. En **Cloudflare > Workers > [nombre del nuevo agente] > Settings > Variables and Secrets**, añade el secreto **`NVIDIA_API_KEY`** de ese cliente. Sin él, el chat no atenderá mensajes. El Worker utiliza el modelo indicado en su binding `NVIDIA_MODEL`.
+6. Comprueba `https://NUEVO-WORKER.TU-SUBDOMINIO.workers.dev/api/health`, pega el código en la web autorizada y prueba una conversación real.
+
+**Seguridad:** el token del administrador nunca sale del servidor; el backend exige sesión y un origen HTTP coincidente. El nombre del Worker se genera a partir del identificador del agente y del dominio y no se acepta código arbitrario desde la web. Si el Worker ya existe, **no lo sobrescribe**; para actualizarlo se usa su ZIP y el despliegue manual. No elimina ni cambia la base de datos o el chat de Refu. Cada cliente obtiene contadores y almacenamiento independientes, pero los Workers se administran bajo la misma cuenta Cloudflare hasta que decidas migrarlos.
+
+**Limitaciones actuales:** despliegue directo solo de chat de texto, sin herramientas externas, sin panel administrativo separado y sin configuración automática de dominio propio. No permite enviar correos ni reservar mesas. Las pruebas automáticas simulan la API de Cloudflare; **se requiere una prueba real con el token configurado** antes de dar el mecanismo por validado en producción.
