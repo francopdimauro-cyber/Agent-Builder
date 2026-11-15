@@ -92,6 +92,17 @@ Un agente con «Requiere aprobación» no se puede publicar.
 `agents/refu.json` es **Refu**, el asistente de El Refugio de Chilla: en la pestaña Agentes pulsa **Importar .json**,
 guárdalo, actívalo y publícalo desde Chat web.
 
+### Estructura del repo: el Agent Builder y las webs que lo embeben
+
+El repo separa dos cosas que no se despliegan juntas:
+
+- **`public/` + `src/`** — el Agent Builder: el panel (crear agentes, ejecutarlos, publicarlos como chat) y su
+  backend. Esto es lo que corre en tu Worker (o en Node).
+- **`sites/`** — webs de ejemplo de negocios que **usan** un agente ya publicado, con el `<script>` de `widget.js`
+  embebido de verdad. `sites/refugio-de-chilla/` es la web de Refu: sirve para probar el embebido de principio a
+  fin y como plantilla para la web de cualquier otro cliente. Estas webs no dependen del código del Agent Builder;
+  solo necesitan el `data-chat` de un chat publicado (ver arriba) y pueden alojarse en cualquier sitio.
+
 ## Qué cambia respecto al original (Lovable + Supabase)
 
 | Original | Aquí |
