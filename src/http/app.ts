@@ -4,6 +4,7 @@ import type { Ctx } from "../context.ts";
 import { ValidationError } from "../domain/validate.ts";
 import { AppError } from "../errors.ts";
 import { registerAuthRoutes } from "../routes/auth.ts";
+import { registerRecoveryRoutes } from "../routes/recovery.ts";
 import { registerAgentRoutes } from "../routes/agents.ts";
 import { registerExecutionRoutes } from "../routes/executions.ts";
 import { registerPublicChatRoutes } from "../routes/public-chat.ts";
@@ -39,6 +40,7 @@ export function toResponse(out: Res): Response {
 export function createHandler(ctx: Ctx): (request: Request, info?: RequestInfo) => Promise<Response> {
   const router = new Router();
   registerAuthRoutes(router, ctx);
+  registerRecoveryRoutes(router, ctx);
   registerSystemRoutes(router, ctx);
   registerAgentRoutes(router, ctx);
   registerExecutionRoutes(router, ctx);
