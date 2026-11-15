@@ -123,7 +123,7 @@ export function assembleStandalone({ agent, config, siteOrigin, workerSource, wi
     "6. Comprueba: https://" + workerName + ".TU-SUBDOMINIO.workers.dev/api/health",
     "",
     "INTEGRAR EN LA WEB:",
-    "Abre EMBEBER_EN_WEB.html, sustituye TU-SUBDOMINIO por tu subdominio de Cloudflare",
+    "Abre EMBEBER_EN_WEB.txt, sustituye TU-SUBDOMINIO por tu subdominio de Cloudflare",
     "y pega el script justo antes del cierre de body en la web " + origin,
     "El dominio debe figurar exactamente en allowedOrigins dentro de src/agent.json.",
     "www y sin www son dos orígenes diferentes; añade ambos si la web usa los dos.",
@@ -159,7 +159,7 @@ export function assembleStandalone({ agent, config, siteOrigin, workerSource, wi
     "package.json": JSON.stringify(packageJson, null, 2) + "\n",
     ".gitignore": "node_modules/\n.wrangler/\n.dev.vars\n.env\n",
     "README.md": readme,
-    "EMBEBER_EN_WEB.html": embed
+    "EMBEBER_EN_WEB.txt": embed
   };
   return { workerName, chatId, origin, files, zip: makeZip(files) };
 }
