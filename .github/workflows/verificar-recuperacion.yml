@@ -1,0 +1,27 @@
+name: Verificar restablecimiento seguro de accesos
+on:
+  push:
+    branches:
+      - seguridad-restablecer-acceso-refu-20261115
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  seguridad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Instalar dependencias
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Pruebas de seguridad y regresión
+        run: npm test
+      - name: Comprobar configuración
+        run: |
+          grep -q 'ALLOW_REGISTRATION = "false"' wrangler.toml
+          test -f public/recuperar.html
+          echo 'Recuperación disponible; registro público cerrado'
